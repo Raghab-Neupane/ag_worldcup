@@ -8,15 +8,12 @@
       <h2 class="group-title">GROUP A</h2>
 
       <div class="match-box">
-        <!-- Pass Mexico parameters to Countrybox component -->
         <Countrybox name="MEXICO" flagSrc="" />
 
-        <!-- VS Indicator Graphic -->
         <div class="vs-container">
           <img src="/vs.svg" alt="vs" class="vs-svg" />
         </div>
 
-        <!-- Pass South Africa parameters to Countrybox component -->
         <Countrybox name="SOUTH AFRICA" flagSrc="" />
       </div>
 
@@ -32,9 +29,10 @@
 import Background from '../components/background.vue'
 import Countrybox from '../components/countrybox.vue'
 import ViewWinnerButton from '../components/button.vue'
+import { goToWinner } from '../router/router.vue'
 
 const showWinner = () => {
-  console.log('Winner revealed!')
+  goToWinner()
 }
 </script>
 
@@ -65,7 +63,7 @@ const showWinner = () => {
 /* GROUP A Title Header */
 .group-title {
   font-family: 'Work Sans', sans-serif;
-  padding-top: 10px;
+  padding-top: 20px;
   font-weight: 700;
   font-size: 60px;
   color: #ffffff;
@@ -73,15 +71,16 @@ const showWinner = () => {
   letter-spacing: 0px;
   text-transform: uppercase;
   text-shadow: 0 4px 15px rgba(0, 0, 0, 0.65);
-  padding-bottom: 40px;
+  padding-bottom: 24px;
 }
 
 /* Flex row containing cards and VS graphic */
 .match-box {
   display: flex;
+  margin-top:50px;
   align-items: center;
   justify-content: center;
-  gap: clamp(1.5rem, 14vw, 28.5rem); /* Increased gap to push cards away from the center VS icon */
+  gap: clamp(1.5rem, 10vw, 13.5rem); /* Increased gap to push cards away from the center VS icon */
   width: 100%;
   padding: 0 1.5rem;
   box-sizing: border-box;
@@ -110,6 +109,7 @@ const showWinner = () => {
   display: flex;
   justify-content: center;
   width: 100%;
+  margin-top: 59px;
 }
 
 @media (max-width: 600px) {
