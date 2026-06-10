@@ -13,7 +13,7 @@
       </div>
     </div>
     <!-- Country name rendered below card -->
-    <span class="country-name">{{ name || 'COUNTRY' }}</span>
+    <h3 class="country-text">{{ name }}</h3>
   </div>
 </template>
 
@@ -89,7 +89,7 @@ defineProps({
 }
 
 /* Country Name styling underneath card */
-.country-name {
+.country-text {
   font-family: 'Kanit', sans-serif;
   font-weight: 800;
   font-size: clamp(1.1rem, 1.8vw, 1.5rem);
@@ -98,6 +98,7 @@ defineProps({
   letter-spacing: 1.5px;
   text-shadow: 0 3px 8px rgba(0, 0, 0, 0.65);
   text-align: center;
+  margin: 0;
 }
 
 /* Responsive adjustments */

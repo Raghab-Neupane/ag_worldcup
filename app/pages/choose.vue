@@ -8,13 +8,13 @@
       <h2 class="group-title">GROUP A</h2>
 
       <div class="match-box">
-        <Countrybox name="MEXICO" flagSrc="" />
+        <Countrybox />
 
         <div class="vs-container">
           <img src="/vs.svg" alt="vs" class="vs-svg" />
         </div>
 
-        <Countrybox name="SOUTH AFRICA" flagSrc="" />
+        <Countrybox />
       </div>
 
       <!-- View Winner CTA Button -->
@@ -77,10 +77,11 @@ const showWinner = () => {
 /* Flex row containing cards and VS graphic */
 .match-box {
   display: flex;
-  margin-top:50px;
+  margin-top: 50px;
   align-items: center;
   justify-content: center;
-  gap: clamp(1.5rem, 10vw, 13.5rem); /* Increased gap to push cards away from the center VS icon */
+  gap: clamp(1.5rem, 10vw, 13.5rem);
+  /* Increased gap to push cards away from the center VS icon */
   width: 100%;
   padding: 0 1.5rem;
   box-sizing: border-box;
@@ -96,13 +97,11 @@ const showWinner = () => {
   justify-content: center;
   flex-shrink: 0;
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
-  
 }
 
-.vs-container img{
-    height: 290px;
+.vs-container img {
+  height: 290px;
 }
-
 
 /* Winner CTA Button Centering Layout */
 .button-wrapper {
@@ -112,15 +111,102 @@ const showWinner = () => {
   margin-top: 59px;
 }
 
+/* LAPTOPS WITH SHORTER SCREEN HEIGHTS (e.g. MacBook 13") */
+@media (max-height: 900px) and (min-width: 1024px) {
+  .prediction-container {
+    padding-top: 140px;
+  }
+
+  .group-title {
+    font-size: 48px;
+    padding-bottom: 12px;
+    margin-bottom: 1rem;
+  }
+
+  .match-box {
+    margin-top: 20px;
+    margin-bottom: 1.5rem;
+  }
+
+  .vs-container img {
+    height: 220px;
+  }
+
+  .button-wrapper {
+    margin-top: 20px;
+  }
+}
+
 @media (max-width: 600px) {
   .match-box {
     flex-direction: column;
     gap: 1.5rem;
   }
-  
+
   .vs-container {
     transform: rotate(90deg);
     margin: 0.5rem 0;
+  }
+}
+
+/* RESPONSIVE SCALING FOR LAPTOPS TO BIG TV SCREENS */
+@media (min-width: 1200px) {
+  .prediction-container {
+    max-width: 1400px;
+    padding-top: 280px;
+  }
+
+  .group-title {
+    font-size: 80px;
+  }
+
+  .vs-container img {
+    height: 350px;
+  }
+
+  .match-box {
+    margin-top: 60px;
+    margin-bottom: 5rem;
+  }
+}
+
+@media (min-width: 1920px) {
+  .prediction-container {
+    max-width: 1800px;
+    padding-top: 320px;
+  }
+
+  .group-title {
+    font-size: 110px;
+  }
+
+  .vs-container img {
+    height: 460px;
+  }
+
+  .match-box {
+    margin-top: 80px;
+    margin-bottom: 7rem;
+  }
+}
+
+@media (min-width: 2560px) {
+  .prediction-container {
+    max-width: 2400px;
+    padding-top: 400px;
+  }
+
+  .group-title {
+    font-size: 150px;
+  }
+
+  .vs-container img {
+    height: 600px;
+  }
+
+  .match-box {
+    margin-top: 100px;
+    margin-bottom: 9rem;
   }
 }
 </style>
