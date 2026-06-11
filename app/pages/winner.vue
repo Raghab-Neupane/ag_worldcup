@@ -2,11 +2,8 @@
     <section class="winner-page">
         <Background />
 
-        <!-- Confetti Canvas -->
-        <canvas ref="confettiCanvas" class="confetti-canvas"></canvas>
-
-        <!-- Firework Canvas -->
-        <canvas ref="fireworkCanvas" class="firework-canvas"></canvas>
+        <!-- Lottie Celebration Canvas (replaces both confetti + firework canvases) -->
+        <canvas ref="lottieCanvas" class="lottie-canvas"></canvas>
 
         <div v-if="participantsError || matchError" class="error-message"
             style="position: relative; z-index: 10; color: white; text-align: center; margin-top: 20vh; font-size: 2rem;">
@@ -32,6 +29,7 @@ import { ref, onMounted, computed, onUnmounted, watch } from 'vue'
 import { useFetch } from '#app'
 import Background from '../components/background.vue'
 import { goToCongratulations } from '../router/router.vue'
+import lottie, { type AnimationItem } from 'lottie-web'
 
 interface Winner {
     name: string
@@ -53,9 +51,9 @@ watch(participants, (val) => {
 const { data: selectedMatch, error: matchError } = await useFetch<any>(`${config.public.apiBase}/matches/selectedmatch`)
 
 // ─── CONFIGURABLE TIMING ───────────────────────────────────────────
-const totalDuration = 38000  // 18 seconds total
-const startDelay = 0        // Very fast start
-const endDelay = 800        // Very slow end
+const totalDuration = 18000  // 38 seconds total
+const startDelay = 10        // Very fast start
+const endDelay = 800         // Very slow end
 // ──────────────────────────────────────────────────────────────────
 
 const currentIndex = ref(0)
@@ -64,11 +62,13 @@ const isFinished = ref(false)
 const hasEntered = ref(false)
 let animationComplete = false
 
-// Confetti and Firework refs
-const confettiCanvas = ref<HTMLCanvasElement | null>(null)
-const fireworkCanvas = ref<HTMLCanvasElement | null>(null)
-let confettiInterval: number | null = null
-let fireworkInterval: number | null = null
+// Lottie canvas ref & animation instance
+const lottieCanvas = ref<HTMLCanvasElement | null>(null)
+let lottieAnim: AnimationItem | null = null
+
+// Track repeated celebration intervals (for lottie replays)
+let celebrationReplayInterval: ReturnType<typeof setInterval> | null = null
+let celebrationStopTimeout: ReturnType<typeof setTimeout> | null = null
 
 const currentItem = computed(() => {
     if (isFinished.value && finalWinner.value) return finalWinner.value
@@ -92,149 +92,69 @@ const easeOutExpo = (x: number): number => {
     return x === 1 ? 1 : 1 - Math.pow(2, -10 * x)
 }
 
-// Confetti Animation
-const startConfetti = () => {
-    if (!confettiCanvas.value) return
-    const canvas = confettiCanvas.value
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    canvas.width = window.innerWidth
-    canvas.height = window.innerHeight
-
-    const particles: any[] = []
-    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ff8800', '#ff44cc']
-
-    for (let i = 0; i < 150; i++) {
-        particles.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height - canvas.height,
-            size: Math.random() * 8 + 4,
-            speedX: (Math.random() - 0.5) * 3,
-            speedY: Math.random() * 5 + 3,
-            color: colors[Math.floor(Math.random() * colors.length)],
-            rotation: Math.random() * 360,
-            rotationSpeed: (Math.random() - 0.5) * 10
-        })
-    }
-
-    const animate = () => {
-        if (!ctx || !canvas) return
-        ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-        let allFinished = true
-        for (let p of particles) {
-            if (p.y < canvas.height + 100) {
-                allFinished = false
-                p.x += p.speedX
-                p.y += p.speedY
-                p.rotation += p.rotationSpeed
-
-                ctx.save()
-                ctx.translate(p.x, p.y)
-                ctx.rotate(p.rotation * Math.PI / 180)
-                ctx.fillStyle = p.color
-                ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size)
-                ctx.restore()
-            }
-        }
-
-        if (!allFinished) {
-            requestAnimationFrame(animate)
-        } else {
-            if (confettiCanvas.value) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height)
-            }
-        }
-    }
-
-    animate()
-}
-
-// Firework Animation
-const startFirework = () => {
-    if (!fireworkCanvas.value) return
-    const canvas = fireworkCanvas.value
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    canvas.width = window.innerWidth
-    canvas.height = window.innerHeight
-
-    const particles: any[] = []
-    const colors = ['#ff4444', '#ff8844', '#ffff44', '#44ff44', '#44ffff', '#ff44ff']
-
-    const centerX = canvas.width / 2
-    const centerY = canvas.height / 2
-
-    for (let i = 0; i < 80; i++) {
-        const angle = (Math.PI * 2 * i) / 80
-        const speed = Math.random() * 8 + 4
-        particles.push({
-            x: centerX,
-            y: centerY,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
-            size: Math.random() * 4 + 2,
-            color: colors[Math.floor(Math.random() * colors.length)],
-            life: 1,
-            gravity: 0.2
-        })
-    }
-
-    const animate = () => {
-        if (!ctx || !canvas) return
-        ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-        let anyAlive = false
-        for (let i = particles.length - 1; i >= 0; i--) {
-            const p = particles[i]
-            p.x += p.vx
-            p.y += p.vy
-            p.vy += p.gravity
-            p.life -= 0.02
-
-            if (p.life > 0 && p.y < canvas.height + 100) {
-                anyAlive = true
-                ctx.globalAlpha = p.life
-                ctx.fillStyle = p.color
-                ctx.beginPath()
-                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
-                ctx.fill()
-            } else {
-                particles.splice(i, 1)
-            }
-        }
-
-        if (anyAlive) {
-            requestAnimationFrame(animate)
-        } else {
-            if (fireworkCanvas.value) {
-                ctx.clearRect(0, 0, canvas.width, canvas.height)
-            }
-        }
-    }
-
-    animate()
-}
-
+// ─── LOTTIE CELEBRATION ────────────────────────────────────────────
+// Plays the combined firework+confetti Lottie JSON.
+// Called once when the winner is revealed, then replayed every ~1.5s
+// for 4 seconds total (matching the original canvas behaviour).
 const startCelebration = () => {
-    startConfetti()
-    setTimeout(() => startFirework(), 200)
+    if (!lottieCanvas.value) return
 
-    confettiInterval = setInterval(() => startConfetti(), 800) as unknown as number
-    fireworkInterval = setInterval(() => startFirework(), 1200) as unknown as number
+    // Destroy any previous instance before creating a new one
+    if (lottieAnim) {
+        lottieAnim.destroy()
+        lottieAnim = null
+    }
 
-    setTimeout(() => {
-        if (confettiInterval) clearInterval(confettiInterval)
-        if (fireworkInterval) clearInterval(fireworkInterval)
+    // lottie-web supports a <canvas> renderer which keeps the canvas
+    // element approach familiar and avoids injecting extra DOM nodes.
+    lottieAnim = lottie.loadAnimation({
+        // "canvas" renderer draws directly onto our <canvas> element
+        // via an internal 2D context — no extra wrapper div needed.
+        container: lottieCanvas.value as unknown as Element,
+        renderer: 'canvas',
+        loop: false,        // We control looping manually with replay
+        autoplay: true,
+        // Path relative to the Nuxt /public directory
+        path: '/firework_burst_confetti.json',
+        rendererSettings: {
+            // Make the Lottie canvas fill the viewport via CSS;
+            // tell the renderer to use the element's own dimensions.
+            preserveAspectRatio: 'xMidYMid slice',
+            clearCanvas: true,
+        }
+    })
+
+    // Replay every 1 500 ms so the burst keeps firing (same cadence as
+    // the original setInterval(startConfetti, 800) + setInterval(startFirework, 1200))
+    celebrationReplayInterval = setInterval(() => {
+        if (lottieAnim) {
+            lottieAnim.goToAndPlay(0, true) // restart from frame 0
+        }
+    }, 1500)
+
+    // Stop replaying after 4 seconds (same as original setTimeout 4000 ms)
+    celebrationStopTimeout = setTimeout(() => {
+        if (celebrationReplayInterval) {
+            clearInterval(celebrationReplayInterval)
+            celebrationReplayInterval = null
+        }
+        // Let the last play-through finish naturally; Lottie's loop: false
+        // means it will stop on the last frame then we can clear the canvas.
+        if (lottieAnim) {
+            lottieAnim.addEventListener('complete', () => {
+                if (lottieAnim) {
+                    lottieAnim.destroy()
+                    lottieAnim = null
+                }
+            })
+        }
     }, 4000)
 }
 
+// ─── NAVIGATION ────────────────────────────────────────────────────
 const navigateToCongratulations = async () => {
     const winner = finalWinner.value || currentItem.value
 
-    // Update backend with the selected winner
     if (selectedMatch.value?.match_no) {
         try {
             await $fetch(`${config.public.apiBase}/matches/selectedmatch/${selectedMatch.value.match_no}`, {
@@ -249,12 +169,30 @@ const navigateToCongratulations = async () => {
     goToCongratulations()
 }
 
+// ─── LIFECYCLE ─────────────────────────────────────────────────────
 onMounted(() => {
     requestAnimationFrame(() => { hasEntered.value = true })
     selectFinalWinner()
 
+    // Size the canvas to the viewport on mount so Lottie fills the screen
+    if (lottieCanvas.value) {
+        lottieCanvas.value.width = window.innerWidth
+        lottieCanvas.value.height = window.innerHeight
+    }
+
+    // Resize canvas if the window is resized
+    const onResize = () => {
+        if (lottieCanvas.value) {
+            lottieCanvas.value.width = window.innerWidth
+            lottieCanvas.value.height = window.innerHeight
+            // Resize event also calls resize() on the animation so it redraws
+            if (lottieAnim) lottieAnim.resize()
+        }
+    }
+    window.addEventListener('resize', onResize)
+
     const startTime = Date.now()
-    let timeoutId: number | null = null
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
 
     const runCycle = () => {
         const elapsed = Date.now() - startTime
@@ -267,7 +205,7 @@ onMounted(() => {
             startCelebration()
             setTimeout(() => {
                 navigateToCongratulations()
-            }, 1500) // Small pause to see the winner, then auto-go
+            }, 1500)
 
             return
         }
@@ -278,15 +216,32 @@ onMounted(() => {
         const easedProgress = easeOutExpo(progress)
         const delay = startDelay + (endDelay - startDelay) * easedProgress
 
-        timeoutId = setTimeout(runCycle, delay) as unknown as number
+        timeoutId = setTimeout(runCycle, delay)
     }
 
     runCycle()
+
+        // Cleanup resize listener on unmount (stored so onUnmounted can remove it)
+        ; (window as any).__winnerPageResizeHandler = onResize
 })
 
 onUnmounted(() => {
-    if (confettiInterval) clearInterval(confettiInterval)
-    if (fireworkInterval) clearInterval(fireworkInterval)
+    // Clear celebration replay timers
+    if (celebrationReplayInterval) clearInterval(celebrationReplayInterval)
+    if (celebrationStopTimeout) clearTimeout(celebrationStopTimeout)
+
+    // Destroy Lottie instance to free memory & cancel any pending RAF
+    if (lottieAnim) {
+        lottieAnim.destroy()
+        lottieAnim = null
+    }
+
+    // Remove resize listener
+    const handler = (window as any).__winnerPageResizeHandler
+    if (handler) {
+        window.removeEventListener('resize', handler)
+        delete (window as any).__winnerPageResizeHandler
+    }
 })
 </script>
 
@@ -301,8 +256,8 @@ onUnmounted(() => {
     overflow: hidden;
 }
 
-.confetti-canvas,
-.firework-canvas {
+/* Single Lottie canvas that replaces both .confetti-canvas and .firework-canvas */
+.lottie-canvas {
     position: fixed;
     top: 0;
     left: 0;
@@ -310,10 +265,6 @@ onUnmounted(() => {
     height: 100%;
     pointer-events: none;
     z-index: 10;
-}
-
-.firework-canvas {
-    z-index: 11;
 }
 
 .winner-card {

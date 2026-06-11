@@ -4,6 +4,7 @@
     <div class="country-card">
       <div class="flag-placeholder">
         <div v-if="flagSvg" class="flag-svg-container" v-html="flagSvg"></div>
+        <img v-else-if="customFlagImg" :src="customFlagImg" alt="flag" class="flag-img" />
         <img v-else src="" alt="flag fallback" class="flag-img" />
       </div>
     </div>
@@ -28,7 +29,7 @@ const props = defineProps({
   }
 })
 
-const flagSvg = computed(() => {
+const countryCode = computed(() => {
   if (!props.name) return null;
 
   // Convert country name to ISO alpha-2 code
@@ -39,9 +40,25 @@ const flagSvg = computed(() => {
   if (lowerName === 'usa' || lowerName === 'united states') code = 'US'
   if (lowerName === 'uk' || lowerName === 'england') code = 'GB'
   if (lowerName === 'south korea') code = 'KR'
+  // Register Curaçao mapping
+  if (lowerName === 'curacao' || lowerName === 'curaçao') code = 'CW'
 
+  return code
+})
+
+const flagSvg = computed(() => {
+  const code = countryCode.value
   if (code && (flags as any)[code]) {
     return (flags as any)[code]
+  }
+  return null
+})
+
+const customFlagImg = computed(() => {
+  const code = countryCode.value
+  // Manually added asset because CW is missing from country-flag-icons
+  if (code === 'CW') {
+    return '/flags/cw.svg'
   }
   return null
 })
