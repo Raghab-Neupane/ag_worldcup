@@ -1,6 +1,10 @@
 <template>
   <div class="choose-page" :class="{ 'exiting': isExiting }">
+
     <Background />
+    <Flags />
+
+
 
     <main class="prediction-container">
       <div class="prediction-container-wrapper">

@@ -2,7 +2,14 @@
     <section class="winner-page">
         <Background />
 
-        <div class="winner-card" :class="{ 'entered': hasEntered }" @click="handleCardClick" style="cursor: pointer;">
+        <!-- Confetti Canvas -->
+        <canvas ref="confettiCanvas" class="confetti-canvas"></canvas>
+
+        <!-- Firework Canvas -->
+        <canvas ref="fireworkCanvas" class="firework-canvas"></canvas>
+
+        <div class="winner-card" :class="{ 'entered': hasEntered, 'popping': isPopping }" @click="handleCardClick"
+            style="cursor: pointer;">
             <div class="winner-card-inner">
                 <div class="winner-content">
                     <Transition name="slide">
@@ -18,10 +25,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Background from '../components/background.vue'
 import rawData from '../data.json'
+import { goToCongratulations } from '../router/router.vue'
 
 interface Winner {
     name: string
@@ -32,19 +40,27 @@ interface Winner {
 const router = useRouter()
 const namesList = ref<Winner[]>(rawData)
 
-const totalDuration = 15000 // 15 seconds total
-const startDelay = 40 // Very fast start
-const endDelay = 2500 // Very slow end
+// ─── CONFIGURABLE TIMING ───────────────────────────────────────────
+const totalDuration = 180  // 8 seconds total
+const startDelay = 40      // Slower at start (400ms per item)
+const endDelay = 780       // Very slow at end (1200ms per item)
+// ──────────────────────────────────────────────────────────────────
 
 const currentIndex = ref(0)
 const finalWinner = ref<Winner | null>(null)
 const isFinished = ref(false)
 const hasEntered = ref(false)
+const isPopping = ref(false)
+let animationComplete = false
+
+// Confetti and Firework refs
+const confettiCanvas = ref<HTMLCanvasElement | null>(null)
+const fireworkCanvas = ref<HTMLCanvasElement | null>(null)
+let confettiInterval: number | null = null
+let fireworkInterval: number | null = null
 
 const currentItem = computed(() => {
-    if (isFinished.value && finalWinner.value) {
-        return finalWinner.value
-    }
+    if (isFinished.value && finalWinner.value) return finalWinner.value
     return namesList.value[currentIndex.value] || { name: '', phone: '' }
 })
 
@@ -60,48 +76,216 @@ const selectFinalWinner = () => {
     finalWinner.value = namesList.value[randomIndex] || null
 }
 
-onMounted(() => {
-    // Fast entrance trigger
-    requestAnimationFrame(() => {
-        hasEntered.value = true
-    })
+// Easing function for smooth deceleration
+const easeOutCubic = (x: number): number => {
+    return 1 - Math.pow(1 - x, 3)
+}
 
+// Confetti Animation
+const startConfetti = () => {
+    if (!confettiCanvas.value) return
+
+    const canvas = confettiCanvas.value
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    canvas.width = window.innerWidth
+    canvas.height = window.innerHeight
+
+    const particles: any[] = []
+    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ff8800', '#ff44cc']
+
+    for (let i = 0; i < 150; i++) {
+        particles.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height - canvas.height,
+            size: Math.random() * 8 + 4,
+            speedX: (Math.random() - 0.5) * 3,
+            speedY: Math.random() * 5 + 3,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            rotation: Math.random() * 360,
+            rotationSpeed: (Math.random() - 0.5) * 10
+        })
+    }
+
+    const animate = () => {
+        if (!ctx || !canvas) return
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+        let allFinished = true
+        for (let p of particles) {
+            if (p.y < canvas.height + 100) {
+                allFinished = false
+                p.x += p.speedX
+                p.y += p.speedY
+                p.rotation += p.rotationSpeed
+
+                ctx.save()
+                ctx.translate(p.x, p.y)
+                ctx.rotate(p.rotation * Math.PI / 180)
+                ctx.fillStyle = p.color
+                ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size)
+                ctx.restore()
+            }
+        }
+
+        if (!allFinished) {
+            requestAnimationFrame(animate)
+        } else {
+            if (confettiCanvas.value) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height)
+            }
+        }
+    }
+
+    animate()
+}
+
+// Firework Animation
+const startFirework = () => {
+    if (!fireworkCanvas.value) return
+
+    const canvas = fireworkCanvas.value
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    canvas.width = window.innerWidth
+    canvas.height = window.innerHeight
+
+    const particles: any[] = []
+    const colors = ['#ff4444', '#ff8844', '#ffff44', '#44ff44', '#44ffff', '#ff44ff']
+
+    const centerX = canvas.width / 2
+    const centerY = canvas.height / 2
+
+    for (let i = 0; i < 80; i++) {
+        const angle = (Math.PI * 2 * i) / 80
+        const speed = Math.random() * 8 + 4
+        particles.push({
+            x: centerX,
+            y: centerY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            size: Math.random() * 4 + 2,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            life: 1,
+            gravity: 0.2
+        })
+    }
+
+    const animate = () => {
+        if (!ctx || !canvas) return
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+        let anyAlive = false
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const p = particles[i]
+            p.x += p.vx
+            p.y += p.vy
+            p.vy += p.gravity
+            p.life -= 0.02
+
+            if (p.life > 0 && p.y < canvas.height + 100) {
+                anyAlive = true
+                ctx.globalAlpha = p.life
+                ctx.fillStyle = p.color
+                ctx.beginPath()
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
+                ctx.fill()
+            } else {
+                particles.splice(i, 1)
+            }
+        }
+
+        if (anyAlive) {
+            requestAnimationFrame(animate)
+        } else {
+            if (fireworkCanvas.value) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height)
+            }
+        }
+    }
+
+    animate()
+}
+
+const startCelebration = () => {
+    startConfetti()
+    setTimeout(() => {
+        startFirework()
+    }, 200)
+
+    // Repeated bursts for more celebration effect
+    confettiInterval = setInterval(() => {
+        startConfetti()
+    }, 800) as unknown as number
+
+    fireworkInterval = setInterval(() => {
+        startFirework()
+    }, 1200) as unknown as number
+
+    // Stop after 4 seconds
+    setTimeout(() => {
+        if (confettiInterval) clearInterval(confettiInterval)
+        if (fireworkInterval) clearInterval(fireworkInterval)
+    }, 4000)
+}
+
+const navigateToCongratulations = () => {
+    if (!animationComplete) return
+
+    startCelebration()
+
+    // Wait for celebration to start then navigate
+    setTimeout(() => {
+        const winner = finalWinner.value || currentItem.value
+        goToCongratulations()
+    }, 500)
+}
+
+const handleCardClick = () => {
+    // Lock the screen - prevent any further action
+    if (!animationComplete) return
+
+    // Add popping animation
+    isPopping.value = true
+
+    // Start celebration and navigate
+    navigateToCongratulations()
+}
+
+onMounted(() => {
+    requestAnimationFrame(() => { hasEntered.value = true })
     selectFinalWinner()
 
     const startTime = Date.now()
+    let timeoutId: number | null = null
 
     const runCycle = () => {
         const elapsed = Date.now() - startTime
 
         if (elapsed >= totalDuration) {
             isFinished.value = true
+            animationComplete = true
             return
         }
 
         currentIndex.value = (currentIndex.value + 1) % namesList.value.length
 
-        // Eased progress: starts fast, slows down dramatically
-        const progress = elapsed / totalDuration
-        // Use ease-out-expo style: fast at start, very slow at end
-        const easedProgress = 1 - Math.pow(1 - progress, 4)
+        const progress = Math.min(1, elapsed / totalDuration)
+        const easedProgress = easeOutCubic(progress)
         const delay = startDelay + (endDelay - startDelay) * easedProgress
 
-        setTimeout(runCycle, delay)
+        timeoutId = setTimeout(runCycle, delay) as unknown as number
     }
 
     runCycle()
 })
 
-const handleCardClick = () => {
-    const winner = finalWinner.value || currentItem.value
-    router.push({
-        path: '/congratulations',
-        query: {
-            name: winner.name,
-            phone: winner.phone
-        }
-    })
-}
+onUnmounted(() => {
+    if (confettiInterval) clearInterval(confettiInterval)
+    if (fireworkInterval) clearInterval(fireworkInterval)
+})
 </script>
 
 <style scoped>
@@ -115,39 +299,67 @@ const handleCardClick = () => {
     overflow: hidden;
 }
 
-/* ========== FAST ENTRANCE ANIMATION ========== */
+.confetti-canvas,
+.firework-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.firework-canvas {
+    z-index: 11;
+}
 
 .winner-card {
     position: relative;
     z-index: 5;
-
     width: 550px;
     height: 176px;
     padding: 6px;
     border-radius: 42px;
-
     background: linear-gradient(180deg,
             #d0d0d0 0%,
             #f0f0f0 50%,
             #b0b0b0 100%);
-
     box-shadow:
         0 0 0 2px #a0a0a0,
         0 10px 30px rgba(0, 0, 0, 0.35),
         inset 0 1px 0 rgba(255, 255, 255, 0.6);
-
-    opacity: 0;
     transform: scale(0.3) translateY(60px);
-    /* Fast entrance: 0.5s */
-    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    cursor: pointer;
 }
 
 .winner-card.entered {
-    opacity: 1;
     transform: scale(1) translateY(0);
 }
 
-/* Quick settle */
+/* Balloon Pop Animation */
+.winner-card.popping {
+    animation: balloonPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes balloonPop {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    30% {
+        transform: scale(1.3);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(0);
+        opacity: 0;
+    }
+}
+
 .winner-card.entered {
     animation: cardSettle 0.4s ease-out 0.5s both;
 }
@@ -165,8 +377,6 @@ const handleCardClick = () => {
         transform: scale(1);
     }
 }
-
-/* ========== REST OF STYLES ========== */
 
 .winner-card-inner {
     width: 100%;
@@ -242,7 +452,7 @@ const handleCardClick = () => {
 /* SLIDE TRANSITION */
 .slide-enter-active,
 .slide-leave-active {
-    transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease-out;
+    transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease-out;
 }
 
 .slide-enter-from {

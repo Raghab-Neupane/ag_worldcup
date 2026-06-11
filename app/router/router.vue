@@ -1,10 +1,12 @@
 <script lang="ts">
 import { navigateTo } from '#app'
 
+
 // Named exports for routes to allow easy name/path updates later on
 export const ROUTES = {
   CHOOSE: '/choose',
-  WINNER: '/winner'
+  WINNER: '/winner',
+  CONGRATULATIONS: '/congratulations'
 }
 
 /**
@@ -19,5 +21,12 @@ export function goToWinner() {
  */
 export function goToChoose() {
   return navigateTo(ROUTES.CHOOSE)
+}
+
+/**
+ * Navigates to the Congratulations page.
+ */
+export function goToCongratulations() {
+  return navigateTo(ROUTES.CONGRATULATIONS)
 }
 </script>
