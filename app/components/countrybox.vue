@@ -9,7 +9,7 @@
       </div>
     </div>
     <!-- Country name rendered below card -->
-    <h3 class="country-text">{{ name }}</h3>
+    <h3 class="country-text" v-html="formattedName"></h3>
   </div>
 </template>
 
@@ -27,6 +27,17 @@ const props = defineProps({
     type: String,
     default: 'MEXICO'
   }
+})
+
+const formattedName = computed(() => {
+  if (!props.name) return ''
+  const words = props.name.trim().split(/\s+/)
+  // If the name has 3 or more words, put the last word on a new line
+  if (words.length >= 3) {
+    const lastWord = words.pop()
+    return words.join(' ') + '<br>' + lastWord
+  }
+  return props.name
 })
 
 const countryCode = computed(() => {
