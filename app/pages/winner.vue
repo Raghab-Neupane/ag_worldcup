@@ -8,8 +8,12 @@
         <!-- Firework Canvas -->
         <canvas ref="fireworkCanvas" class="firework-canvas"></canvas>
 
-        <div class="winner-card" :class="{ 'entered': hasEntered, 'popping': isPopping }" @click="handleCardClick"
-            style="cursor: pointer;">
+        <div v-if="participantsError || matchError" class="error-message"
+            style="position: relative; z-index: 10; color: white; text-align: center; margin-top: 20vh; font-size: 2rem;">
+            Error fetching data: {{ participantsError?.message || matchError?.message }}
+        </div>
+        <div v-else class="winner-card" :class="{ 'entered': hasEntered, 'popping': isPopping }"
+            @click="handleCardClick" style="cursor: pointer;">
             <div class="winner-card-inner">
                 <div class="winner-content">
                     <Transition name="slide">
@@ -25,10 +29,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed, onUnmounted, watch } from 'vue'
+import { useFetch } from '#app'
 import Background from '../components/background.vue'
-import rawData from '../data.json'
 import { goToCongratulations } from '../router/router.vue'
 
 interface Winner {
@@ -37,13 +40,23 @@ interface Winner {
     image?: string
 }
 
-const router = useRouter()
-const namesList = ref<Winner[]>(rawData)
+// Get runtime config
+const config = useRuntimeConfig()
+
+// Fetch participants from backend
+const { data: participants, error: participantsError } = await useFetch<Winner[]>(`${config.public.apiBase}/participants`)
+const namesList = ref<Winner[]>(participants.value || [])
+watch(participants, (val) => {
+    if (val) namesList.value = val
+})
+
+// Fetch the currently selected match to get its match_no
+const { data: selectedMatch, error: matchError } = await useFetch<any>(`${config.public.apiBase}/matches/selectedmatch`)
 
 // ─── CONFIGURABLE TIMING ───────────────────────────────────────────
-const totalDuration = 180  // 8 seconds total
-const startDelay = 40      // Slower at start (400ms per item)
-const endDelay = 780       // Very slow at end (1200ms per item)
+const totalDuration = 18000  // 8 seconds total
+const startDelay = 30      // Slower at start (400ms per item)
+const endDelay = 2800       // Very slow at end (1200ms per item)
 // ──────────────────────────────────────────────────────────────────
 
 const currentIndex = ref(0)
@@ -231,14 +244,27 @@ const startCelebration = () => {
     }, 4000)
 }
 
-const navigateToCongratulations = () => {
+const navigateToCongratulations = async () => {
     if (!animationComplete) return
 
     startCelebration()
 
+    const winner = finalWinner.value || currentItem.value
+
+    // Update backend with the selected winner
+    if (selectedMatch.value?.match_no) {
+        try {
+            await $fetch(`${config.public.apiBase}/matches/selectedmatch/${selectedMatch.value.match_no}`, {
+                method: 'PATCH',
+                body: { winner: winner.name, phone: winner.phone }
+            })
+        } catch (e) {
+            console.error('Failed to post winner:', e)
+        }
+    }
+
     // Wait for celebration to start then navigate
     setTimeout(() => {
-        const winner = finalWinner.value || currentItem.value
         goToCongratulations()
     }, 500)
 }
@@ -297,6 +323,17 @@ onUnmounted(() => {
     justify-content: center;
     align-items: center;
     overflow: hidden;
+}
+
+.winner-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 50%;
+    margin-bottom: 10px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .confetti-canvas,

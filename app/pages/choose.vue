@@ -2,17 +2,19 @@
   <div class="choose-page" :class="{ 'exiting': isExiting }">
 
     <Background />
-    <Flags />
 
 
 
-    <main class="prediction-container">
+    <div v-if="error" class="error-message" style="position: relative; z-index: 10; color: white; text-align: center; margin-top: 20vh; font-size: 2rem;">
+      Error fetching match: {{ error.message }}
+    </div>
+    <main v-else class="prediction-container">
       <div class="prediction-container-wrapper">
-        <h2 class="group-title">{{ selectedMatch?.stage || 'GROUP A' }}</h2>
+        <h2 class="group-title">{{ selectedMatch?.stage }}</h2>
 
         <div class="match-box">
           <div class="team-wrapper team-left">
-            <Countrybox :name="selectedMatch?.team1 || 'MEXICO'" />
+            <Countrybox :name="selectedMatch?.team1" />
           </div>
 
           <div class="vs-container">
@@ -20,7 +22,7 @@
           </div>
 
           <div class="team-wrapper team-right">
-            <Countrybox :name="selectedMatch?.team2 || 'SOUTH AFRICA'" />
+            <Countrybox :name="selectedMatch?.team2" />
           </div>
         </div>
       </div>
@@ -36,7 +38,8 @@
 import { ref } from 'vue'
 import { useFetch } from '#app'
 
-const { data: selectedMatch } = await useFetch<any>('http://localhost:8000/matches/selectedmatch')
+const config = useRuntimeConfig()
+const { data: selectedMatch, error } = await useFetch<any>(`${config.public.apiBase}/matches/selectedmatch`)
 
 import Background from '../components/background.vue'
 import Countrybox from '../components/countrybox.vue'

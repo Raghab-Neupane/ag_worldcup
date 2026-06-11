@@ -17,7 +17,7 @@
 
             <!-- Winner profile photo -->
             <div class="winner-profile">
-                <img :src="winnerImage" alt="winner profile" class="profile-img">
+                <img :src="winnerImage">
             </div>
 
             <!-- Winner name and phone -->
@@ -42,15 +42,24 @@ let fireworkInstance: any = null
 let firework2Instance: any = null
 let intervals: number[] = []
 
-const winnerName = computed(() => route.query.name || 'Sanjay Koirala')
+const config = useRuntimeConfig()
+const { data: selectedMatch } = await useFetch<any>(`${config.public.apiBase}/matches/selectedmatch`)
+const { data: participants } = await useFetch<any[]>(`${config.public.apiBase}/participants`)
+
+const winnerName = computed(() => selectedMatch.value?.winner || '_')
 const winnerPhone = computed(() => {
-    const rawPhone = (route.query.phone as string) || '98******67'
-    if (rawPhone === '98******67') return rawPhone
+    const rawPhone = selectedMatch.value?.phone || '_'
+    if (rawPhone === '98******67' || rawPhone === '_') return rawPhone
     const p = rawPhone.trim()
     if (p.length <= 4) return p
     return p.slice(0, 2) + '*'.repeat(p.length - 4) + p.slice(-2)
 })
-const winnerImage = computed(() => '/profile.png')
+
+const winnerImage = computed(() => {
+    const base = config.public.assetsUrl || ''
+    const participant = participants.value?.find(p => p.name === winnerName.value)
+    return participant?.image ? base + '/' + participant.image : base + '/profile.webp'
+})
 
 // Lottie refs
 const confettiLottie = ref<HTMLDivElement | null>(null)
