@@ -1,23 +1,26 @@
 <template>
-  <div class="choose-page">
-    <!-- Background stadium canvas layer -->
+  <div class="choose-page" :class="{ 'exiting': isExiting }">
     <Background />
 
-    <!-- Predictor page container -->
     <main class="prediction-container">
-      <h2 class="group-title">GROUP A</h2>
+      <div class="prediction-container-wrapper">
+        <h2 class="group-title">{{ selectedMatch?.stage || 'GROUP A' }}</h2>
 
-      <div class="match-box">
-        <Countrybox />
+        <div class="match-box">
+          <div class="team-wrapper team-left">
+            <Countrybox :name="selectedMatch?.team1 || 'MEXICO'" />
+          </div>
 
-        <div class="vs-container">
-          <img src="/vs.svg" alt="vs" class="vs-svg" />
+          <div class="vs-container">
+            <img src="/vs.svg" alt="vs" class="vs-svg" />
+          </div>
+
+          <div class="team-wrapper team-right">
+            <Countrybox :name="selectedMatch?.team2 || 'SOUTH AFRICA'" />
+          </div>
         </div>
-
-        <Countrybox />
       </div>
 
-      <!-- View Winner CTA Button -->
       <div class="button-wrapper">
         <ViewWinnerButton @click="showWinner" />
       </div>
@@ -26,13 +29,23 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
+import { useFetch } from '#app'
+
+const { data: selectedMatch } = await useFetch<any>('http://localhost:8000/matches/selectedmatch')
+
 import Background from '../components/background.vue'
 import Countrybox from '../components/countrybox.vue'
 import ViewWinnerButton from '../components/button.vue'
 import { goToWinner } from '../router/router.vue'
 
+const isExiting = ref(false)
+
 const showWinner = () => {
-  goToWinner()
+  isExiting.value = true
+  setTimeout(() => {
+    goToWinner()
+  }, 800) // Increased from 600ms to 1200ms
 }
 </script>
 
@@ -42,9 +55,47 @@ const showWinner = () => {
   width: 100%;
   min-height: 100vh;
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
-/* Prediction container alignment details */
+/* ========== EXIT ANIMATIONS — SLOWER ========== */
+
+.choose-page.exiting .team-left {
+  transform: translateX(-150vw);
+  opacity: 0;
+}
+
+.choose-page.exiting .team-right {
+  transform: translateX(150vw);
+  opacity: 0;
+}
+
+.choose-page.exiting .vs-container {
+  transform: scale(0) rotate(180deg);
+  opacity: 0;
+}
+
+.choose-page.exiting .group-title {
+  transform: translateY(-100px);
+  opacity: 0;
+}
+
+.choose-page.exiting .button-wrapper {
+  transform: translateY(100px) scale(0.8);
+  opacity: 0;
+}
+
+/* Slower transition: 1.2s instead of 0.6s */
+.team-left,
+.team-right,
+.vs-container,
+.group-title,
+.button-wrapper {
+  transition: all 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* ========== BASE STYLES ========== */
+
 .prediction-container {
   position: relative;
   z-index: 5;
@@ -52,45 +103,50 @@ const showWinner = () => {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding-top: 260px;
+  min-height: 100vh;
   width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
   box-sizing: border-box;
-  padding-bottom: 2rem;
+  padding: 33vh 4vw 5vh;
 }
 
-/* GROUP A Title Header */
+.prediction-container-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-top: 1vh;
+}
+
 .group-title {
   font-family: 'Work Sans', sans-serif;
-  padding-top: 20px;
   font-weight: 700;
-  font-size: 60px;
+  font-size: clamp(14px, 3.5vw, 70px);
   color: #ffffff;
-  margin: 0 0 1.5rem 0;
-  letter-spacing: 0px;
+  margin: 0 0 6vh 0;
+  letter-spacing: 2px;
   text-transform: uppercase;
   text-shadow: 0 4px 15px rgba(0, 0, 0, 0.65);
-  padding-bottom: 24px;
 }
 
-/* Flex row containing cards and VS graphic */
 .match-box {
   display: flex;
-  margin-top: 50px;
   align-items: center;
   justify-content: center;
-  gap: clamp(1.5rem, 10vw, 13.5rem);
-  /* Increased gap to push cards away from the center VS icon */
+  gap: clamp(1rem, 5vw, 20rem);
   width: 100%;
-  padding: 0 1.5rem;
+  max-width: 80vw;
+  margin: 0 auto 5vh auto;
   box-sizing: border-box;
-  margin-bottom: 3.5rem;
 }
 
-/* VS Graphic Placement Container */
+.team-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .vs-container {
-  width: 170px;
+  width: clamp(60px, 10vw, 500px);
   height: 0px;
   display: flex;
   align-items: center;
@@ -100,113 +156,61 @@ const showWinner = () => {
 }
 
 .vs-container img {
-  height: 290px;
+  height: clamp(80px, 15vw, 800px);
 }
 
-/* Winner CTA Button Centering Layout */
 .button-wrapper {
   display: flex;
   justify-content: center;
   width: 100%;
-  margin-top: 59px;
+  margin-top: clamp(2vh, 2vw, 15vh);
+  transition: all 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
-/* LAPTOPS WITH SHORTER SCREEN HEIGHTS (e.g. MacBook 13") */
-@media (max-height: 900px) and (min-width: 1024px) {
+/* Responsive */
+@media (max-width: 1024px) {
   .prediction-container {
-    padding-top: 140px;
-  }
-
-  .group-title {
-    font-size: 48px;
-    padding-bottom: 12px;
-    margin-bottom: 1rem;
+    padding-top: 25vh;
   }
 
   .match-box {
-    margin-top: 20px;
-    margin-bottom: 1.5rem;
-  }
-
-  .vs-container img {
-    height: 220px;
-  }
-
-  .button-wrapper {
-    margin-top: 20px;
+    max-width: 95vw;
+    gap: 2rem;
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
+  .prediction-container {
+    padding-top: 22vh;
+    justify-content: flex-start;
+  }
+
   .match-box {
     flex-direction: column;
     gap: 1.5rem;
+    margin-bottom: 2rem;
   }
 
   .vs-container {
     transform: rotate(90deg);
-    margin: 0.5rem 0;
-  }
-}
-
-/* RESPONSIVE SCALING FOR LAPTOPS TO BIG TV SCREENS */
-@media (min-width: 1200px) {
-  .prediction-container {
-    max-width: 1400px;
-    padding-top: 280px;
-  }
-
-  .group-title {
-    font-size: 80px;
+    margin: 1.5rem 0;
+    height: auto;
   }
 
   .vs-container img {
-    height: 350px;
+    height: 100px;
   }
 
-  .match-box {
-    margin-top: 60px;
-    margin-bottom: 5rem;
-  }
-}
-
-@media (min-width: 1920px) {
-  .prediction-container {
-    max-width: 1800px;
-    padding-top: 320px;
+  .button-wrapper {
+    margin-top: 1rem;
   }
 
-  .group-title {
-    font-size: 110px;
+  .choose-page.exiting .team-left {
+    transform: translateX(-100vw) translateY(-50px);
   }
 
-  .vs-container img {
-    height: 460px;
-  }
-
-  .match-box {
-    margin-top: 80px;
-    margin-bottom: 7rem;
-  }
-}
-
-@media (min-width: 2560px) {
-  .prediction-container {
-    max-width: 2400px;
-    padding-top: 400px;
-  }
-
-  .group-title {
-    font-size: 150px;
-  }
-
-  .vs-container img {
-    height: 600px;
-  }
-
-  .match-box {
-    margin-top: 100px;
-    margin-bottom: 9rem;
+  .choose-page.exiting .team-right {
+    transform: translateX(100vw) translateY(-50px);
   }
 }
 </style>

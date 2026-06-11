@@ -55,20 +55,20 @@ const handleClick = () => {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 16px;
-  padding: 18px 32px 18px 28px;
+  gap: 0.66em; /* 16px */
+  padding: 0.75em 1.33em 0.75em 1.16em;
   background: linear-gradient(180deg, #4da6ff 0%, #1a75ff 40%, #0066ff 100%);
   border: none;
-  border-radius: 50px;
+  border-radius: 2em;
   color: #ffffff;
-  font-size: 24px;
+  font-size: clamp(16px, 1.5vw, 100px); /* Makes the button fluid and massive on 8K TVs */
   font-weight: 800;
-  letter-spacing: 2px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
   box-shadow: 
-    0 8px 0 #0a0a0a,
-    0 12px 20px rgba(0, 0, 0, 0.4);
+    0 0.33em 0 #0a0a0a,
+    0 0.5em 0.8em rgba(0, 0, 0, 0.4);
   transition: all 0.15s ease;
   overflow: hidden;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -89,16 +89,16 @@ const handleClick = () => {
     rgba(255, 255, 255, 0.15) 50%,
     rgba(255, 255, 255, 0) 100%
   );
-  border-radius: 50px 50px 40% 40% / 30px 30px 100% 100%;
+  border-radius: 2em 2em 40% 40% / 1.25em 1.25em 100% 100%;
   pointer-events: none;
 }
 
 /* Inner highlight border */
 .inner-border {
   position: absolute;
-  inset: 3px;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-radius: 50px;
+  inset: 0.12em; /* 3px */
+  border: 0.08em solid rgba(255, 255, 255, 0.35); /* 2px */
+  border-radius: 2em;
   pointer-events: none;
 }
 
@@ -106,62 +106,62 @@ const handleClick = () => {
 .trophy-icon {
   position: relative;
   z-index: 1;
-  width: 36px;
-  height: 36px;
+  width: 1.5em; /* 36px */
+  height: 1.5em;
   flex-shrink: 0;
   fill: #ffffff;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+  filter: drop-shadow(0 0.04em 0.08em rgba(0, 0, 0, 0.2));
 }
 
 /* Center text */
 .btn-text {
   position: relative;
   z-index: 1;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 0.04em 0.08em rgba(0, 0, 0, 0.2);
 }
 
 /* Arrow circle */
 .arrow-circle {
   position: relative;
   z-index: 1;
-  width: 36px;
-  height: 36px;
+  width: 1.5em;
+  height: 1.5em;
   border-radius: 50%;
   background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin-left: 4px;
+  margin-left: 0.16em; /* 4px */
 }
 
 .arrow-circle svg {
-  width: 18px;
-  height: 18px;
+  width: 0.75em; /* 18px */
+  height: 0.75em;
   fill: #0066ff;
 }
 
 /* Hover state */
 .winner-btn:hover {
-  transform: translateY(-2px);
+  transform: translateY(-0.08em);
   box-shadow: 
-    0 10px 0 #0a0a0a,
-    0 14px 24px rgba(0, 0, 0, 0.45);
+    0 0.41em 0 #0a0a0a,
+    0 0.58em 1em rgba(0, 0, 0, 0.45);
   background: linear-gradient(180deg, #5cb3ff 0%, #2a85ff 40%, #1a75ff 100%);
 }
 
 /* Active/pressed state */
 .winner-btn:active,
 .winner-btn.is-pressed {
-  transform: translateY(6px);
+  transform: translateY(0.25em);
   box-shadow: 
-    0 2px 0 #0a0a0a,
-    0 4px 8px rgba(0, 0, 0, 0.3);
+    0 0.08em 0 #0a0a0a,
+    0 0.16em 0.33em rgba(0, 0, 0, 0.3);
 }
 
 /* Focus state for accessibility */
 .winner-btn:focus-visible {
-  outline: 3px solid #0066ff;
-  outline-offset: 4px;
+  outline: 0.12em solid #0066ff;
+  outline-offset: 0.16em;
 }
 </style>

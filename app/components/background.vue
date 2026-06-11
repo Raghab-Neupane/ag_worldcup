@@ -8,9 +8,10 @@
       <div class="left-logo">
         <img src="/logo.png" alt="logo">
       </div>
-
-      <div class="header">
-        <img src="/pagetittle.png">
+      <div class="tittle-wrapper">
+        <div class="header">
+          <img src="/pagetittle.png">
+        </div>
       </div>
 
       <div class="righttop-white-overlay">

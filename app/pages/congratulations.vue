@@ -26,7 +26,13 @@ import Background from '../components/background.vue'
 
 const route = useRoute()
 const winnerName = computed(() => route.query.name || 'Sanjay Koirala')
-const winnerPhone = computed(() => route.query.phone || '98******67')
+const winnerPhone = computed(() => {
+    const rawPhone = (route.query.phone as string) || '98******67'
+    if (rawPhone === '98******67') return rawPhone
+    const p = rawPhone.trim()
+    if (p.length <= 4) return p
+    return p.slice(0, 2) + '*'.repeat(p.length - 4) + p.slice(-2)
+})
 const winnerImage = computed(() => '/profile.png') // default profile picture
 </script>
 
@@ -122,24 +128,30 @@ const winnerImage = computed(() => '/profile.png') // default profile picture
     .congratulations-page {
         padding-top: 90px;
     }
+
     .congrats-container {
         gap: 16px;
     }
+
     .congrats-title-wrapper {
         padding: 10px 24px;
     }
+
     .congrats-title-wrapper img {
         height: 120px;
     }
+
     .winner-profile {
         width: 140px;
         height: 140px;
         border-width: 3px;
         border-radius: 16px;
     }
+
     .winner-name {
         font-size: 36px;
     }
+
     .winner-phone {
         font-size: 26px;
     }

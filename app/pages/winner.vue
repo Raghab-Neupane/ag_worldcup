@@ -2,13 +2,13 @@
     <section class="winner-page">
         <Background />
 
-        <div class="winner-card" @click="handleCardClick" style="cursor: pointer;">
+        <div class="winner-card" :class="{ 'entered': hasEntered }" @click="handleCardClick" style="cursor: pointer;">
             <div class="winner-card-inner">
                 <div class="winner-content">
                     <Transition name="slide">
                         <div :key="currentIndex" class="slide-item">
                             <h4 class="winner-name">{{ currentItem.name }}</h4>
-                            <h4 class="winner-phone">{{ currentItem.phone }}</h4>
+                            <h4 class="winner-phone">{{ formatPhone(currentItem.phone) }}</h4>
                         </div>
                     </Transition>
                 </div>
@@ -24,21 +24,22 @@ import Background from '../components/background.vue'
 import rawData from '../data.json'
 
 interface Winner {
-    name: string;
-    phone: string;
-    image?: string;
+    name: string
+    phone: string
+    image?: string
 }
 
 const router = useRouter()
 const namesList = ref<Winner[]>(rawData)
 
-const totalDuration = 5000 // 15 seconds
-const startDelay = 50 // ms
-const endDelay = 1200 // ms
+const totalDuration = 15000 // 15 seconds total
+const startDelay = 40 // Very fast start
+const endDelay = 2500 // Very slow end
 
 const currentIndex = ref(0)
 const finalWinner = ref<Winner | null>(null)
 const isFinished = ref(false)
+const hasEntered = ref(false)
 
 const currentItem = computed(() => {
     if (isFinished.value && finalWinner.value) {
@@ -47,13 +48,24 @@ const currentItem = computed(() => {
     return namesList.value[currentIndex.value] || { name: '', phone: '' }
 })
 
-// Pick a random winner at start
+const formatPhone = (phone: string) => {
+    if (!phone) return ''
+    const p = phone.trim()
+    if (p.length <= 4) return p
+    return p.slice(0, 2) + '*'.repeat(p.length - 4) + p.slice(-2)
+}
+
 const selectFinalWinner = () => {
     const randomIndex = Math.floor(Math.random() * namesList.value.length)
     finalWinner.value = namesList.value[randomIndex] || null
 }
 
 onMounted(() => {
+    // Fast entrance trigger
+    requestAnimationFrame(() => {
+        hasEntered.value = true
+    })
+
     selectFinalWinner()
 
     const startTime = Date.now()
@@ -66,12 +78,13 @@ onMounted(() => {
             return
         }
 
-        // Cycle to next name
         currentIndex.value = (currentIndex.value + 1) % namesList.value.length
 
-        // Eased progress (cubic ease-out style delay growth)
+        // Eased progress: starts fast, slows down dramatically
         const progress = elapsed / totalDuration
-        const delay = startDelay + (endDelay - startDelay) * Math.pow(progress, 3.5)
+        // Use ease-out-expo style: fast at start, very slow at end
+        const easedProgress = 1 - Math.pow(1 - progress, 4)
+        const delay = startDelay + (endDelay - startDelay) * easedProgress
 
         setTimeout(runCycle, delay)
     }
@@ -83,6 +96,10 @@ const handleCardClick = () => {
     const winner = finalWinner.value || currentItem.value
     router.push({
         path: '/congratulations',
+        query: {
+            name: winner.name,
+            phone: winner.phone
+        }
     })
 }
 </script>
@@ -92,25 +109,21 @@ const handleCardClick = () => {
     position: relative;
     width: 100%;
     min-height: 100vh;
-
     display: flex;
     justify-content: center;
     align-items: center;
-
     overflow: hidden;
 }
 
+/* ========== FAST ENTRANCE ANIMATION ========== */
 
-/* OUTER SILVER/GREY FRAME */
 .winner-card {
     position: relative;
     z-index: 5;
 
     width: 550px;
     height: 176px;
-
     padding: 6px;
-
     border-radius: 42px;
 
     background: linear-gradient(180deg,
@@ -122,64 +135,70 @@ const handleCardClick = () => {
         0 0 0 2px #a0a0a0,
         0 10px 30px rgba(0, 0, 0, 0.35),
         inset 0 1px 0 rgba(255, 255, 255, 0.6);
+
+    opacity: 0;
+    transform: scale(0.3) translateY(60px);
+    /* Fast entrance: 0.5s */
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* INNER GRADIENT RING */
+.winner-card.entered {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+/* Quick settle */
+.winner-card.entered {
+    animation: cardSettle 0.4s ease-out 0.5s both;
+}
+
+@keyframes cardSettle {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.02);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* ========== REST OF STYLES ========== */
+
 .winner-card-inner {
     width: 100%;
     height: 100%;
-
     padding: 4px;
-
     border-radius: 36px;
-
-    background: linear-gradient(180deg,
-            #FFE36C 0%,
-            #FFC200 33%,
-            #F5A800 66%,
-            #E58200 100%);
-
+    background: linear-gradient(180deg, #E58200 0%, #F5A800 35%, #FFC200 70%, #FFE36C 100%);
     box-sizing: border-box;
 }
 
-/* GOLD CARD */
 .winner-content {
     position: relative;
-
     width: 100%;
     height: 100%;
-
     border-radius: 32px;
-
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-
     overflow: hidden;
-
-    background: linear-gradient(180deg,
-            #f6e57d 0%,
-            #f6d64a 30%,
-            #ffbf00 70%,
-            #eb8a00 100%);
+    background: linear-gradient(180deg, #FFE36C 0%, #FFC200 30%, #F5A800 70%, #E58200 100%);
 }
 
-/* TOP GLOSS EFFECT */
 .winner-content::before {
     content: '';
-
     position: absolute;
     top: 0;
     left: 0;
-
     width: 100%;
-    height: 50%;
-
-    border-radius: 28px 28px 0 0;
-
-    background: rgba(255, 255, 255, 0.15);
-
+    height: 100%;
+    border-radius: 32px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.05) 40%, rgba(255, 255, 255, 0) 100%);
     pointer-events: none;
     z-index: 2;
 }
@@ -196,42 +215,34 @@ const handleCardClick = () => {
 
 .winner-name {
     margin: 0;
-
-    color: #3E022F;
-
+    color: rgba(62, 2, 47, 1);
     font-family: 'Work Sans', sans-serif;
     font-size: 40px;
     font-weight: 700;
     font-style: normal;
     line-height: 100%;
     letter-spacing: 0%;
-
     text-align: center;
-
     z-index: 1;
 }
 
 .winner-phone {
     margin: 8px 0 0;
-
     color: #3E022F;
-
     font-family: 'Work Sans', sans-serif;
     font-size: 32px;
     font-weight: 600;
     font-style: normal;
     line-height: 100%;
     letter-spacing: 0%;
-
     text-align: center;
-
     z-index: 1;
 }
 
 /* SLIDE TRANSITION */
 .slide-enter-active,
 .slide-leave-active {
-    transition: transform 0.15s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.15s ease-out;
+    transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease-out;
 }
 
 .slide-enter-from {
