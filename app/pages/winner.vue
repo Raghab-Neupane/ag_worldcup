@@ -12,8 +12,7 @@
             style="position: relative; z-index: 10; color: white; text-align: center; margin-top: 20vh; font-size: 2rem;">
             Error fetching data: {{ participantsError?.message || matchError?.message }}
         </div>
-        <div v-else class="winner-card" :class="{ 'entered': hasEntered, 'popping': isPopping }"
-            @click="handleCardClick" style="cursor: pointer;">
+        <div v-else class="winner-card" :class="{ 'entered': hasEntered }">
             <div class="winner-card-inner">
                 <div class="winner-content">
                     <Transition name="slide">
@@ -50,20 +49,19 @@ watch(participants, (val) => {
     if (val) namesList.value = val
 })
 
-// Fetch the currently selected match to get its match_no
+// Fetch the currently selected match
 const { data: selectedMatch, error: matchError } = await useFetch<any>(`${config.public.apiBase}/matches/selectedmatch`)
 
 // ─── CONFIGURABLE TIMING ───────────────────────────────────────────
-const totalDuration = 18000  // 8 seconds total
-const startDelay = 30      // Slower at start (400ms per item)
-const endDelay = 2800       // Very slow at end (1200ms per item)
+const totalDuration = 38000  // 18 seconds total
+const startDelay = 0        // Very fast start
+const endDelay = 800        // Very slow end
 // ──────────────────────────────────────────────────────────────────
 
 const currentIndex = ref(0)
 const finalWinner = ref<Winner | null>(null)
 const isFinished = ref(false)
 const hasEntered = ref(false)
-const isPopping = ref(false)
 let animationComplete = false
 
 // Confetti and Firework refs
@@ -89,15 +87,14 @@ const selectFinalWinner = () => {
     finalWinner.value = namesList.value[randomIndex] || null
 }
 
-// Easing function for smooth deceleration
-const easeOutCubic = (x: number): number => {
-    return 1 - Math.pow(1 - x, 3)
+// Easing: fast at start, dramatically slows at end
+const easeOutExpo = (x: number): number => {
+    return x === 1 ? 1 : 1 - Math.pow(2, -10 * x)
 }
 
 // Confetti Animation
 const startConfetti = () => {
     if (!confettiCanvas.value) return
-
     const canvas = confettiCanvas.value
     const ctx = canvas.getContext('2d')
     if (!ctx) return
@@ -157,7 +154,6 @@ const startConfetti = () => {
 // Firework Animation
 const startFirework = () => {
     if (!fireworkCanvas.value) return
-
     const canvas = fireworkCanvas.value
     const ctx = canvas.getContext('2d')
     if (!ctx) return
@@ -224,20 +220,11 @@ const startFirework = () => {
 
 const startCelebration = () => {
     startConfetti()
-    setTimeout(() => {
-        startFirework()
-    }, 200)
+    setTimeout(() => startFirework(), 200)
 
-    // Repeated bursts for more celebration effect
-    confettiInterval = setInterval(() => {
-        startConfetti()
-    }, 800) as unknown as number
+    confettiInterval = setInterval(() => startConfetti(), 800) as unknown as number
+    fireworkInterval = setInterval(() => startFirework(), 1200) as unknown as number
 
-    fireworkInterval = setInterval(() => {
-        startFirework()
-    }, 1200) as unknown as number
-
-    // Stop after 4 seconds
     setTimeout(() => {
         if (confettiInterval) clearInterval(confettiInterval)
         if (fireworkInterval) clearInterval(fireworkInterval)
@@ -245,10 +232,6 @@ const startCelebration = () => {
 }
 
 const navigateToCongratulations = async () => {
-    if (!animationComplete) return
-
-    startCelebration()
-
     const winner = finalWinner.value || currentItem.value
 
     // Update backend with the selected winner
@@ -263,21 +246,7 @@ const navigateToCongratulations = async () => {
         }
     }
 
-    // Wait for celebration to start then navigate
-    setTimeout(() => {
-        goToCongratulations()
-    }, 500)
-}
-
-const handleCardClick = () => {
-    // Lock the screen - prevent any further action
-    if (!animationComplete) return
-
-    // Add popping animation
-    isPopping.value = true
-
-    // Start celebration and navigate
-    navigateToCongratulations()
+    goToCongratulations()
 }
 
 onMounted(() => {
@@ -293,13 +262,20 @@ onMounted(() => {
         if (elapsed >= totalDuration) {
             isFinished.value = true
             animationComplete = true
+
+            // 🎯 AUTO NAVIGATE when winner stops — no click needed!
+            startCelebration()
+            setTimeout(() => {
+                navigateToCongratulations()
+            }, 1500) // Small pause to see the winner, then auto-go
+
             return
         }
 
         currentIndex.value = (currentIndex.value + 1) % namesList.value.length
 
         const progress = Math.min(1, elapsed / totalDuration)
-        const easedProgress = easeOutCubic(progress)
+        const easedProgress = easeOutExpo(progress)
         const delay = startDelay + (endDelay - startDelay) * easedProgress
 
         timeoutId = setTimeout(runCycle, delay) as unknown as number
@@ -323,17 +299,6 @@ onUnmounted(() => {
     justify-content: center;
     align-items: center;
     overflow: hidden;
-}
-
-.winner-image {
-    width: 80px;
-    height: 80px;
-    object-fit: cover;
-    border-radius: 50%;
-    margin-bottom: 10px;
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
 }
 
 .confetti-canvas,
@@ -368,51 +333,10 @@ onUnmounted(() => {
         inset 0 1px 0 rgba(255, 255, 255, 0.6);
     transform: scale(0.3) translateY(60px);
     transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-    cursor: pointer;
 }
 
 .winner-card.entered {
     transform: scale(1) translateY(0);
-}
-
-/* Balloon Pop Animation */
-.winner-card.popping {
-    animation: balloonPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-@keyframes balloonPop {
-    0% {
-        transform: scale(1);
-        opacity: 1;
-    }
-
-    30% {
-        transform: scale(1.3);
-        opacity: 1;
-    }
-
-    100% {
-        transform: scale(0);
-        opacity: 0;
-    }
-}
-
-.winner-card.entered {
-    animation: cardSettle 0.4s ease-out 0.5s both;
-}
-
-@keyframes cardSettle {
-    0% {
-        transform: scale(1);
-    }
-
-    50% {
-        transform: scale(1.02);
-    }
-
-    100% {
-        transform: scale(1);
-    }
 }
 
 .winner-card-inner {
