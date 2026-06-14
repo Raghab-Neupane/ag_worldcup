@@ -8,7 +8,9 @@ export default defineNuxtConfig({
       apiBase: process.env.NUXT_PUBLIC_API_BASE_URL,
       appUrl: process.env.NUXT_PUBLIC_APP_URL,
       assetsUrl: process.env.NUXT_PUBLIC_ASSETS_URL,
+      participants: process.env.NUXT_PUBLIC_PARTICIPANTS_URL,
     }
   }
 })
+
 

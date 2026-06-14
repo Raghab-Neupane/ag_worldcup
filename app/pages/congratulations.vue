@@ -44,7 +44,8 @@ let intervals: number[] = []
 
 const config = useRuntimeConfig()
 const { data: selectedMatch } = await useFetch<any>(`${config.public.apiBase}/matches/selectedmatch`)
-const { data: participants } = await useFetch<any[]>(`${config.public.apiBase}/participants`)
+// Participants Endpoint use participants.public.apiBase
+const { data: participants } = await useFetch<any[]>(`${config.public.participants}/participants`)
 
 const winnerName = computed(() => selectedMatch.value?.winner || '_')
 const winnerPhone = computed(() => {

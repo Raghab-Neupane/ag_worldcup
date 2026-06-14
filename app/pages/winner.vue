@@ -41,7 +41,7 @@ interface Winner {
 const config = useRuntimeConfig()
 
 // Fetch participants from backend
-const { data: participants, error: participantsError } = await useFetch<Winner[]>(`${config.public.apiBase}/participants`)
+const { data: participants, error: participantsError } = await useFetch<Winner[]>(`${config.public.participants}/participants`)
 const namesList = ref<Winner[]>(participants.value || [])
 watch(participants, (val) => {
     if (val) namesList.value = val
