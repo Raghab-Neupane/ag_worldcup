@@ -28,7 +28,7 @@
 import { ref, onMounted, computed, onUnmounted, watch } from 'vue'
 import { useFetch } from '#app'
 import Background from '../components/background.vue'
-import { goToCongratulations } from '../router/router.vue'
+import { goToCongratulations } from '../router/router'
 import lottie, { type AnimationItem } from 'lottie-web'
 
 interface Winner {

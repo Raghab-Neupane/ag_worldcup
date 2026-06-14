@@ -44,7 +44,7 @@ const { data: selectedMatch, error } = await useFetch<any>(`${config.public.apiB
 import Background from '../components/background.vue'
 import Countrybox from '../components/countrybox.vue'
 import ViewWinnerButton from '../components/button.vue'
-import { goToWinner } from '../router/router.vue'
+import { goToWinner } from '../router/router'
 
 const isExiting = ref(false)
 

@@ -12,7 +12,7 @@
         <div class="congrats-container" :class="{ 'animate-in': animateIn }">
             <!-- Congratulations title -->
             <div class="congrats-title-wrapper">
-                <img src="/congratulations.png" alt="Congratulations" class="congrats-img">
+                <img src="/Congratulations.png" alt="Congratulations" class="congrats-img">
             </div>
 
             <!-- Winner profile photo -->

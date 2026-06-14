@@ -1,4 +1,3 @@
-<script lang="ts">
 import { navigateTo } from '#app'
 
 
@@ -29,4 +28,3 @@ export function goToChoose() {
 export function goToCongratulations() {
   return navigateTo(ROUTES.CONGRATULATIONS)
 }
-</script>
