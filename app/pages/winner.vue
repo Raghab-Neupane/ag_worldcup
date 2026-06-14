@@ -52,7 +52,7 @@ const { data: selectedMatch, error: matchError } = await useFetch<any>(`${config
 
 // ─── CONFIGURABLE TIMING ───────────────────────────────────────────
 const totalDuration = 18000  // 38 seconds total
-const startDelay = 10        // Very fast start
+const startDelay = -30        // Very fast start
 const endDelay = 800         // Very slow end
 // ──────────────────────────────────────────────────────────────────
 

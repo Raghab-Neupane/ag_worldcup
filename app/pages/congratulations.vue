@@ -419,7 +419,7 @@ onUnmounted(() => {
     }
 }
 
-/* 4K screens */
+/* 4K-screens */
 @media (min-width: 2560px) {
     .congrats-container {
         gap: clamp(24px, 2.5vh, 44px);
