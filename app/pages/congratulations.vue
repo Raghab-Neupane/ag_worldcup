@@ -69,7 +69,8 @@ const { data: winnerDataFromApi } = await useFetch<Winner>(
 // Use API data if available, otherwise fallback to sessionStorage or JSON
 const winnerData = ref<Winner | null>(null)
 if (winnerDataFromApi.value) {
-    winnerData.value = winnerDataFromApi.value
+    // Extract the nested winner object if present
+    winnerData.value = (winnerDataFromApi.value as any).winner || winnerDataFromApi.value
 } else {
     // Existing fallback logic
     const storedWinner = sessionStorage.getItem('winner')
