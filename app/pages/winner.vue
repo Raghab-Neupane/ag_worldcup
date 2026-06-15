@@ -5,9 +5,19 @@
         <!-- Lottie Celebration Canvas -->
         <canvas ref="lottieCanvas" class="lottie-canvas"></canvas>
 
-        <div v-if="participantsError" class="error-message"
-            style="position: relative; z-index: 10; color: white; text-align: center; margin-top: 20vh; font-size: 2rem;">
-            Error loading data: {{ participantsError }}
+        <div v-if="participantsError" class="error-container">
+            <div class="error-box">
+                <div class="caution-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="80" height="80" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="triangle-svg">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" fill="rgba(255, 59, 48, 0.1)"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                </div>
+                <div class="error-message-text">
+                    Error loading data: {{ participantsError }}
+                </div>
+            </div>
         </div>
         <div v-else class="winner-card" :class="{ 'entered': hasEntered, 'finished': isFinished }">
             <div class="winner-card-inner">
@@ -485,5 +495,79 @@ onUnmounted(() => {
     .winner-phone {
         font-size: clamp(20px, 4vw, 34px);
     }
+}
+
+/* Error Showcase Styling */
+.error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 10;
+    margin-top: 15vh;
+    padding: 20px;
+    width: 100%;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.caution-icon {
+    margin-bottom: 24px;
+    filter: drop-shadow(0 4px 12px rgba(255, 59, 48, 0.3));
+    animation: errorShake 0.5s ease-in-out;
+}
+
+@keyframes errorShake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-6px); }
+    40%, 80% { transform: translateX(6px); }
+}
+
+.triangle-svg {
+    display: block;
+}
+
+.error-box {
+    background: #ffffff;
+    border-radius: 24px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    min-height: 260px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 32px 24px;
+    box-sizing: border-box;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.error-box-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.error-title {
+    color: #1a202c;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.error-message-text {
+    color: #e53e3e;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 500;
+    text-align: center;
+    border-top: 1.5px dashed #edf2f7;
+    padding-top: 20px;
+    width: 100%;
+    word-break: break-word;
 }
 </style>
