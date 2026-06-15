@@ -118,7 +118,7 @@ const winnerPhone = computed(() => {
 const winnerImage = computed(() => {
     // Use the photo field from JSON
     const photo = winnerData.value?.photo
-    if (photo && photo !== 'photo') {
+    if (photo) {
         return photo
     }
     // Default profile image
