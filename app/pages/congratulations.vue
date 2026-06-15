@@ -12,7 +12,7 @@
         <div class="congrats-container" :class="{ 'animate-in': animateIn }">
             <!-- Congratulations title -->
             <div class="congrats-title-wrapper">
-                <img src="/Users/raghabneupane/Documents/ag_worldcup/public/Congratulations.png" class="congrats-img">
+                <img src="/Congratulations.png" class="congrats-img">
             </div>
 
             <!-- Winner profile photo -->
@@ -33,7 +33,7 @@
 import { computed, onMounted, ref, onUnmounted } from 'vue'
 import lottie from 'lottie-web'
 import Background from '../components/background.vue'
-import participantsData from '../../participants.json'
+// import participantsData from '../../participants.json' // Deprecated, using API endpoint
 
 interface Winner {
     customer_id: string
@@ -50,7 +50,7 @@ let firework2Instance: any = null
 let intervals: number[] = []
 
 // Get winner data from sessionStorage (passed from winner.vue) or from JSON
-const winnerData = ref<Winner | null>(null)
+// const winnerData = ref<Winner | null>(null) // Removed duplicate, using later declaration
 
 // Lottie refs
 const confettiLottie = ref<HTMLDivElement | null>(null)
@@ -58,6 +58,31 @@ const fireworkLottie = ref<HTMLDivElement | null>(null)
 const fireworkLottie2 = ref<HTMLDivElement | null>(null)
 
 // ========== ENDPOINT PREPARED FOR LATER USE ==========
+const config = useRuntimeConfig()
+// Retrieve post_id from sessionStorage (set in choose page)
+const postId = sessionStorage.getItem('selectedPostId')
+// Fetch winner data dynamically using post_id
+const { data: winnerDataFromApi } = await useFetch<Winner>(
+    `${config.public.winnersEndpoint}?post_id=${postId}`
+)
+// No config needed for dummy link
+// Use API data if available, otherwise fallback to sessionStorage or JSON
+const winnerData = ref<Winner | null>(null)
+if (winnerDataFromApi.value) {
+    winnerData.value = winnerDataFromApi.value
+} else {
+    // Existing fallback logic
+    const storedWinner = sessionStorage.getItem('winner')
+    if (storedWinner) {
+        winnerData.value = JSON.parse(storedWinner)
+        console.log('Winner loaded from sessionStorage:', winnerData.value)
+    } else {
+        // json fallback (commented out)
+        // if (participantsData.winner) {
+        //   winnerData.value = participantsData.winner
+        // }
+    }
+}
 // For now using JSON data, but later you can uncomment these:
 /*
 const config = useRuntimeConfig()
@@ -116,20 +141,25 @@ const loadAnimation = (fileName: string) => {
 }
 
 onMounted(async () => {
+    const config = useRuntimeConfig()
+    // Fetch participants list from dummy endpoint
+    const { data: participantsFromApi } = await useFetch<any[]>(
+        `${config.public.dummyLink}/participants`
+    )
+    // Fetch winner from dummy endpoint
+    const { data: winnerFromApi } = await useFetch<Winner>(
+        `${config.public.dummyLink}/winners`
+    )
+
     // Retrieve winner data from sessionStorage first
     const storedWinner = sessionStorage.getItem('winner')
     if (storedWinner) {
         winnerData.value = JSON.parse(storedWinner)
         console.log('Winner loaded from sessionStorage:', winnerData.value)
     } else {
-        // Fallback to winner from participants.json
-        if (participantsData.winner) {
-            winnerData.value = participantsData.winner
-            console.log('Winner loaded from JSON:', winnerData.value)
-        } else if (participantsData.participants && participantsData.participants.length > 0) {
-            // If no winner specified, use first participant as winner
-            winnerData.value = participantsData.participants[0]
-            console.log('Using first participant as winner:', winnerData.value)
+        if (winnerFromApi.value) {
+            winnerData.value = winnerFromApi.value
+            console.log('Winner loaded from API:', winnerData.value)
         }
     }
 

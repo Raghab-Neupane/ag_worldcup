@@ -41,7 +41,10 @@ interface Participant {
 
 // Extract data from JSON
 const allParticipants: Participant[] = participantsData.participants || []
-const winnerFromJson: Participant | null = participantsData.winner || null
+const config = useRuntimeConfig()
+const postId = sessionStorage.getItem('selectedPostId')
+const { data: winnerDataFromApi } = await useFetch<Participant>(`${config.public.winnersEndpoint}?post_id=${postId}`)
+const winnerFromJson: Participant | null = winnerDataFromApi?.value || participantsData.winner || null
 
 // Build the scrolling array: winner at index 0, then all other participants
 const scrollingList = ref<Participant[]>([])
