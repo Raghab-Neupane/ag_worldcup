@@ -30,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, onUnmounted } from 'vue'
+import { computed, onMounted, ref, onUnmounted, watch } from 'vue'
 import lottie from 'lottie-web'
 import Background from '../components/background.vue'
 // import participantsData from '../../participants.json' // Deprecated, using API endpoint
@@ -68,22 +68,12 @@ const { data: winnerDataFromApi } = await useFetch<Winner>(
 // No config needed for dummy link
 // Use API data if available, otherwise fallback to sessionStorage or JSON
 const winnerData = ref<Winner | null>(null)
-if (winnerDataFromApi.value) {
-    // Extract the nested winner object if present
-    winnerData.value = (winnerDataFromApi.value as any).winner || winnerDataFromApi.value
-} else {
-    // Existing fallback logic
-    const storedWinner = sessionStorage.getItem('winner')
-    if (storedWinner) {
-        winnerData.value = JSON.parse(storedWinner)
-        console.log('Winner loaded from sessionStorage:', winnerData.value)
-    } else {
-        // json fallback (commented out)
-        // if (participantsData.winner) {
-        //   winnerData.value = participantsData.winner
-        // }
+
+watch(winnerDataFromApi, (newVal) => {
+    if (newVal) {
+        winnerData.value = (newVal as any).winner || newVal
     }
-}
+}, { immediate: true })
 // For now using JSON data, but later you can uncomment these:
 /*
 const config = useRuntimeConfig()
@@ -119,7 +109,7 @@ const winnerPhone = computed(() => {
 const winnerImage = computed(() => {
     // Use the photo field from JSON
     const photo = winnerData.value?.photo
-    if (photo) {
+    if (photo && photo !== 'dummy' && photo !== 'photo' && photo !== 'null' && photo !== 'undefined') {
         return photo
     }
     // Default profile image
@@ -155,11 +145,12 @@ onMounted(async () => {
     // Retrieve winner data from sessionStorage first
     const storedWinner = sessionStorage.getItem('winner')
     if (storedWinner) {
-        winnerData.value = JSON.parse(storedWinner)
+        const parsed = JSON.parse(storedWinner)
+        winnerData.value = parsed.winner || parsed
         console.log('Winner loaded from sessionStorage:', winnerData.value)
     } else {
         if (winnerFromApi.value) {
-            winnerData.value = winnerFromApi.value
+            winnerData.value = (winnerFromApi.value as any).winner || winnerFromApi.value
             console.log('Winner loaded from API:', winnerData.value)
         }
     }
