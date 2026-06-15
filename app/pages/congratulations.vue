@@ -12,12 +12,12 @@
         <div class="congrats-container" :class="{ 'animate-in': animateIn }">
             <!-- Congratulations title -->
             <div class="congrats-title-wrapper">
-                <img src="/Congratulations.png" alt="Congratulations" class="congrats-img">
+                <img src="/Users/raghabneupane/Documents/ag_worldcup/public/Congratulations.png" class="congrats-img">
             </div>
 
             <!-- Winner profile photo -->
             <div class="winner-profile">
-                <img :src="winnerImage">
+                <img :src="winnerImage" alt="Winner photo">
             </div>
 
             <!-- Winner name and phone -->
@@ -30,21 +30,38 @@
 </template>
 
 <script setup lang="ts">
-import { useRoute } from 'vue-router'
 import { computed, onMounted, ref, onUnmounted } from 'vue'
 import lottie from 'lottie-web'
 import Background from '../components/background.vue'
+import participantsData from '../../participants.json'
 
-const route = useRoute()
+interface Winner {
+    customer_id: string
+    name: string
+    photo: string
+    point: number
+    mobile_number: string
+}
+
 const animateIn = ref(false)
 let confettiInstance: any = null
 let fireworkInstance: any = null
 let firework2Instance: any = null
 let intervals: number[] = []
 
+// Get winner data from sessionStorage (passed from winner.vue) or from JSON
+const winnerData = ref<Winner | null>(null)
+
+// Lottie refs
+const confettiLottie = ref<HTMLDivElement | null>(null)
+const fireworkLottie = ref<HTMLDivElement | null>(null)
+const fireworkLottie2 = ref<HTMLDivElement | null>(null)
+
+// ========== ENDPOINT PREPARED FOR LATER USE ==========
+// For now using JSON data, but later you can uncomment these:
+/*
 const config = useRuntimeConfig()
 const { data: selectedMatch } = await useFetch<any>(`${config.public.apiBase}/matches/selectedmatch`)
-// Participants Endpoint use participants.public.apiBase
 const { data: participants } = await useFetch<any[]>(`${config.public.participants}/participants`)
 
 const winnerName = computed(() => selectedMatch.value?.winner || '_')
@@ -61,11 +78,27 @@ const winnerImage = computed(() => {
     const participant = participants.value?.find(p => p.name === winnerName.value)
     return participant?.image ? base + '/' + participant.image : base + '/profile.webp'
 })
+*/
+// ========== CURRENT IMPLEMENTATION USING JSON ==========
 
-// Lottie refs
-const confettiLottie = ref<HTMLDivElement | null>(null)
-const fireworkLottie = ref<HTMLDivElement | null>(null)
-const fireworkLottie2 = ref<HTMLDivElement | null>(null)
+const winnerName = computed(() => winnerData.value?.name || 'Winner')
+const winnerPhone = computed(() => {
+    const rawPhone = winnerData.value?.mobile_number || ''
+    if (!rawPhone) return ''
+    const p = rawPhone.trim()
+    if (p.length <= 4) return p
+    return p.slice(0, 2) + '*'.repeat(p.length - 4) + p.slice(-2)
+})
+
+const winnerImage = computed(() => {
+    // Use the photo field from JSON
+    const photo = winnerData.value?.photo
+    if (photo && photo !== 'photo') {
+        return photo
+    }
+    // Default profile image
+    return '/profile.webp'
+})
 
 // Helper function to load animation from public folder
 const loadAnimation = (fileName: string) => {
@@ -83,6 +116,23 @@ const loadAnimation = (fileName: string) => {
 }
 
 onMounted(async () => {
+    // Retrieve winner data from sessionStorage first
+    const storedWinner = sessionStorage.getItem('winner')
+    if (storedWinner) {
+        winnerData.value = JSON.parse(storedWinner)
+        console.log('Winner loaded from sessionStorage:', winnerData.value)
+    } else {
+        // Fallback to winner from participants.json
+        if (participantsData.winner) {
+            winnerData.value = participantsData.winner
+            console.log('Winner loaded from JSON:', winnerData.value)
+        } else if (participantsData.participants && participantsData.participants.length > 0) {
+            // If no winner specified, use first participant as winner
+            winnerData.value = participantsData.participants[0]
+            console.log('Using first participant as winner:', winnerData.value)
+        }
+    }
+
     // Trigger entrance animation
     setTimeout(() => {
         animateIn.value = true
@@ -317,6 +367,12 @@ onUnmounted(() => {
     background: #1a1a1a;
     flex-shrink: 0;
     transition: transform 0.3s ease;
+}
+
+.winner-profile img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .congrats-container.animate-in .winner-profile {

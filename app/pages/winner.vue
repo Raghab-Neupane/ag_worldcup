@@ -2,20 +2,20 @@
     <section class="winner-page">
         <Background />
 
-        <!-- Lottie Celebration Canvas (replaces both confetti + firework canvases) -->
+        <!-- Lottie Celebration Canvas -->
         <canvas ref="lottieCanvas" class="lottie-canvas"></canvas>
 
-        <div v-if="participantsError || matchError" class="error-message"
+        <div v-if="participantsError" class="error-message"
             style="position: relative; z-index: 10; color: white; text-align: center; margin-top: 20vh; font-size: 2rem;">
-            Error fetching data: {{ participantsError?.message || matchError?.message }}
+            Error loading data: {{ participantsError }}
         </div>
-        <div v-else class="winner-card" :class="{ 'entered': hasEntered }">
+        <div v-else class="winner-card" :class="{ 'entered': hasEntered, 'finished': isFinished }">
             <div class="winner-card-inner">
                 <div class="winner-content">
-                    <Transition name="slide">
+                    <Transition name="slide" mode="out-in">
                         <div :key="currentIndex" class="slide-item">
                             <h4 class="winner-name">{{ currentItem.name }}</h4>
-                            <h4 class="winner-phone">{{ formatPhone(currentItem.phone) }}</h4>
+                            <h4 class="winner-phone">{{ formatPhone(currentItem.mobile_number) }}</h4>
                         </div>
                     </Transition>
                 </div>
@@ -25,54 +25,85 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, onUnmounted, watch } from 'vue'
-import { useFetch } from '#app'
+import { ref, onMounted, computed, onUnmounted } from 'vue'
 import Background from '../components/background.vue'
 import { goToCongratulations } from '../router/router'
 import lottie, { type AnimationItem } from 'lottie-web'
+import participantsData from '../../participants.json'
 
-interface Winner {
+interface Participant {
+    customer_id: string
     name: string
-    phone: string
-    image?: string
+    photo: string
+    point: number
+    mobile_number: string
 }
 
-// Get runtime config
-const config = useRuntimeConfig()
+// Extract data from JSON
+const allParticipants: Participant[] = participantsData.participants || []
+const winnerFromJson: Participant | null = participantsData.winner || null
 
-// Fetch participants from backend
-const { data: participants, error: participantsError } = await useFetch<Winner[]>(`${config.public.participants}/participants`)
-const namesList = ref<Winner[]>(participants.value || [])
-watch(participants, (val) => {
-    if (val) namesList.value = val
-})
+// Build the scrolling array: winner at index 0, then all other participants
+const scrollingList = ref<Participant[]>([])
 
-// Fetch the currently selected match
-const { data: selectedMatch, error: matchError } = await useFetch<any>(`${config.public.apiBase}/matches/selectedmatch`)
+// Error handling
+const participantsError = ref<string | null>(null)
 
-// ─── CONFIGURABLE TIMING ───────────────────────────────────────────
-const totalDuration = 18000  // 38 seconds total
-const startDelay = -30        // Very fast start
-const endDelay = 800         // Very slow end
-// ──────────────────────────────────────────────────────────────────
+// Build the list with winner first
+if (winnerFromJson) {
+    // Add winner as first element
+    scrollingList.value.push(winnerFromJson)
+
+    // Add all other participants (excluding the winner)
+    if (allParticipants.length > 0) {
+        const otherParticipants = allParticipants.filter(
+            p => p.customer_id !== winnerFromJson.customer_id
+        )
+        scrollingList.value.push(...otherParticipants)
+    }
+} else if (allParticipants.length > 0) {
+    // If no winner specified, use all participants
+    scrollingList.value = [...allParticipants]
+} else {
+    participantsError.value = 'No participants found in participants.json'
+}
+
+// Set the final winner (always the first element in scrollingList)
+const finalWinnerValue = scrollingList.value[0] || null
+
+// Validate we have data to show
+if (scrollingList.value.length === 0) {
+    participantsError.value = 'No valid participant data available'
+}
+
+// Store winner in sessionStorage for congratulations page
+if (finalWinnerValue) {
+    sessionStorage.setItem('winner', JSON.stringify(finalWinnerValue))
+}
+
+// ─── CONFIGURABLE TIMING FOR LOTTERY-STYLE SCROLLING ──────────────────
+const totalDuration = 18000  // 18 seconds total
+const minDelay = 20          // Fastest scroll speed (very fast at start)
+const maxDelay = 800         // Slowest scroll speed (sudden slow at end)
+// ─────────────────────────────────────────────────────────────────────
 
 const currentIndex = ref(0)
-const finalWinner = ref<Winner | null>(null)
+const finalWinner = ref<Participant | null>(finalWinnerValue)
 const isFinished = ref(false)
 const hasEntered = ref(false)
-let animationComplete = false
+let navigationTimeout: ReturnType<typeof setTimeout> | null = null
 
 // Lottie canvas ref & animation instance
 const lottieCanvas = ref<HTMLCanvasElement | null>(null)
 let lottieAnim: AnimationItem | null = null
 
-// Track repeated celebration intervals (for lottie replays)
+// Track repeated celebration intervals
 let celebrationReplayInterval: ReturnType<typeof setInterval> | null = null
 let celebrationStopTimeout: ReturnType<typeof setTimeout> | null = null
 
 const currentItem = computed(() => {
     if (isFinished.value && finalWinner.value) return finalWinner.value
-    return namesList.value[currentIndex.value] || { name: '', phone: '' }
+    return scrollingList.value[currentIndex.value] || { name: '', mobile_number: '', customer_id: '', photo: '', point: 0 }
 })
 
 const formatPhone = (phone: string) => {
@@ -82,64 +113,123 @@ const formatPhone = (phone: string) => {
     return p.slice(0, 2) + '*'.repeat(p.length - 4) + p.slice(-2)
 }
 
-const selectFinalWinner = () => {
-    const randomIndex = Math.floor(Math.random() * namesList.value.length)
-    finalWinner.value = namesList.value[randomIndex] || null
+// Strong easing function for dramatic slowdown (like a lottery wheel)
+// This creates a "fast fast fast then suddenly slow" effect
+const easeOutElastic = (x: number): number => {
+    const c4 = (2 * Math.PI) / 3
+    return x === 0 ? 0 : x === 1 ? 1 : Math.pow(2, -10 * x) * Math.sin((x * 10 - 0.75) * c4) + 1
 }
 
-// Easing: fast at start, dramatically slows at end
-const easeOutExpo = (x: number): number => {
-    return x === 1 ? 1 : 1 - Math.pow(2, -10 * x)
+const easeOutBack = (x: number): number => {
+    const c1 = 1.70158
+    const c3 = c1 + 1
+    return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2)
 }
 
-// ─── LOTTIE CELEBRATION ────────────────────────────────────────────
-// Plays the combined firework+confetti Lottie JSON.
-// Called once when the winner is revealed, then replayed every ~1.5s
-// for 4 seconds total (matching the original canvas behaviour).
+// Combined easing for best lottery effect: fast start, dramatic slowdown
+const easeLottery = (x: number): number => {
+    if (x < 0.7) {
+        // First 70% of time: very fast scrolling (linear or slight acceleration)
+        return x * 0.3 // Stays in low delay range
+    } else {
+        // Last 30%: dramatic slowdown
+        const slowProgress = (x - 0.7) / 0.3
+        return 0.3 + easeOutBack(slowProgress) * 0.7
+    }
+}
+
+// Function to calculate dynamic delay based on progress
+const calculateDelay = (progress: number): number => {
+    // Use lottery easing for dramatic effect
+    const easedProgress = easeLottery(progress)
+    // Delay ranges from minDelay (fast) to maxDelay (slow)
+    // This creates the "fast fast fast then sudden slow" effect
+    return minDelay + (maxDelay - minDelay) * easedProgress
+}
+
+// setTimeout-based animation with lottery-style scrolling
+let timeoutId: ReturnType<typeof setTimeout> | null = null
+let cycleCount = 0
+
+const startLotteryAnimation = () => {
+    const startTimeRef = Date.now()
+    let previousDelay = minDelay
+    cycleCount = 0
+
+    const runCycle = () => {
+        const elapsed = Date.now() - startTimeRef
+
+        if (elapsed >= totalDuration) {
+            // Stop the animation and show winner
+            if (timeoutId) clearTimeout(timeoutId)
+            timeoutId = null
+
+            currentIndex.value = 0
+            isFinished.value = true
+
+            // Start celebration
+            startCelebration()
+
+            // Navigate to congratulations after celebration
+            navigationTimeout = setTimeout(() => {
+                navigateToCongratulations()
+            }, 1500)
+
+            return
+        }
+
+        const progress = Math.min(1, elapsed / totalDuration)
+        const delay = calculateDelay(progress)
+
+        // Log speed changes for debugging (can remove in production)
+        if (Math.abs(delay - previousDelay) > 50) {
+            console.log(`Speed change: ${previousDelay}ms → ${delay}ms at ${Math.round(progress * 100)}%`)
+            previousDelay = delay
+        }
+
+        // Cycle through participants
+        currentIndex.value = (currentIndex.value + 1) % scrollingList.value.length
+        cycleCount++
+
+        timeoutId = setTimeout(runCycle, delay)
+    }
+
+    runCycle()
+}
+
+// Start celebration animation
 const startCelebration = () => {
     if (!lottieCanvas.value) return
 
-    // Destroy any previous instance before creating a new one
     if (lottieAnim) {
         lottieAnim.destroy()
         lottieAnim = null
     }
 
-    // lottie-web supports a <canvas> renderer which keeps the canvas
-    // element approach familiar and avoids injecting extra DOM nodes.
     lottieAnim = lottie.loadAnimation({
-        // "canvas" renderer draws directly onto our <canvas> element
-        // via an internal 2D context — no extra wrapper div needed.
         container: lottieCanvas.value as unknown as Element,
         renderer: 'canvas',
-        loop: false,        // We control looping manually with replay
+        loop: false,
         autoplay: true,
-        // Path relative to the Nuxt /public directory
         path: '/firework_burst_confetti.json',
         rendererSettings: {
-            // Make the Lottie canvas fill the viewport via CSS;
-            // tell the renderer to use the element's own dimensions.
             preserveAspectRatio: 'xMidYMid slice',
             clearCanvas: true,
         }
     })
 
-    // Replay every 1 500 ms so the burst keeps firing (same cadence as
-    // the original setInterval(startConfetti, 800) + setInterval(startFirework, 1200))
+    // Replay celebration every 1.5 seconds for 4 seconds
     celebrationReplayInterval = setInterval(() => {
         if (lottieAnim) {
-            lottieAnim.goToAndPlay(0, true) // restart from frame 0
+            lottieAnim.goToAndPlay(0, true)
         }
     }, 1500)
 
-    // Stop replaying after 4 seconds (same as original setTimeout 4000 ms)
     celebrationStopTimeout = setTimeout(() => {
         if (celebrationReplayInterval) {
             clearInterval(celebrationReplayInterval)
             celebrationReplayInterval = null
         }
-        // Let the last play-through finish naturally; Lottie's loop: false
-        // means it will stop on the last frame then we can clear the canvas.
         if (lottieAnim) {
             lottieAnim.addEventListener('complete', () => {
                 if (lottieAnim) {
@@ -151,86 +241,65 @@ const startCelebration = () => {
     }, 4000)
 }
 
-// ─── NAVIGATION ────────────────────────────────────────────────────
+// Navigation to congratulations
 const navigateToCongratulations = async () => {
     const winner = finalWinner.value || currentItem.value
-
-    if (selectedMatch.value?.match_no) {
-        try {
-            await $fetch(`${config.public.apiBase}/matches/selectedmatch/${selectedMatch.value.match_no}`, {
-                method: 'PATCH',
-                body: { winner: winner.name, phone: winner.phone }
-            })
-        } catch (e) {
-            console.error('Failed to post winner:', e)
-        }
+    // Store winner data before navigating
+    if (winner) {
+        sessionStorage.setItem('winner', JSON.stringify(winner))
     }
-
-    goToCongratulations()
+    // Small delay to ensure sessionStorage is written
+    setTimeout(() => {
+        goToCongratulations()
+    }, 100)
 }
 
-// ─── LIFECYCLE ─────────────────────────────────────────────────────
+// Lifecycle
 onMounted(() => {
     requestAnimationFrame(() => { hasEntered.value = true })
-    selectFinalWinner()
 
-    // Size the canvas to the viewport on mount so Lottie fills the screen
+    if (scrollingList.value.length === 0) {
+        console.error('No participants data available')
+        return
+    }
+
+    // Setup canvas
     if (lottieCanvas.value) {
         lottieCanvas.value.width = window.innerWidth
         lottieCanvas.value.height = window.innerHeight
     }
 
-    // Resize canvas if the window is resized
+    // Handle window resize
     const onResize = () => {
         if (lottieCanvas.value) {
             lottieCanvas.value.width = window.innerWidth
             lottieCanvas.value.height = window.innerHeight
-            // Resize event also calls resize() on the animation so it redraws
             if (lottieAnim) lottieAnim.resize()
         }
     }
     window.addEventListener('resize', onResize)
 
-    const startTime = Date.now()
-    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    // Start lottery-style animation
+    startLotteryAnimation()
 
-    const runCycle = () => {
-        const elapsed = Date.now() - startTime
+    // Debug logging
+    console.log('Scrolling List:', scrollingList.value)
+    console.log('Final Winner:', finalWinner.value)
+    console.log('Total participants:', scrollingList.value.length)
+    console.log('Lottery-style scrolling started - fast then sudden slow!')
 
-        if (elapsed >= totalDuration) {
-            isFinished.value = true
-            animationComplete = true
-
-            // 🎯 AUTO NAVIGATE when winner stops — no click needed!
-            startCelebration()
-            setTimeout(() => {
-                navigateToCongratulations()
-            }, 1500)
-
-            return
-        }
-
-        currentIndex.value = (currentIndex.value + 1) % namesList.value.length
-
-        const progress = Math.min(1, elapsed / totalDuration)
-        const easedProgress = easeOutExpo(progress)
-        const delay = startDelay + (endDelay - startDelay) * easedProgress
-
-        timeoutId = setTimeout(runCycle, delay)
-    }
-
-    runCycle()
-
-        // Cleanup resize listener on unmount (stored so onUnmounted can remove it)
+        // Store resize handler for cleanup
         ; (window as any).__winnerPageResizeHandler = onResize
 })
 
 onUnmounted(() => {
-    // Clear celebration replay timers
+    // Clear all timeouts and intervals
+    if (timeoutId) clearTimeout(timeoutId)
+    if (navigationTimeout) clearTimeout(navigationTimeout)
     if (celebrationReplayInterval) clearInterval(celebrationReplayInterval)
     if (celebrationStopTimeout) clearTimeout(celebrationStopTimeout)
 
-    // Destroy Lottie instance to free memory & cancel any pending RAF
+    // Destroy Lottie instance
     if (lottieAnim) {
         lottieAnim.destroy()
         lottieAnim = null
@@ -256,7 +325,6 @@ onUnmounted(() => {
     overflow: hidden;
 }
 
-/* Single Lottie canvas that replaces both .confetti-canvas and .firework-canvas */
 .lottie-canvas {
     position: fixed;
     top: 0;
@@ -288,6 +356,22 @@ onUnmounted(() => {
 
 .winner-card.entered {
     transform: scale(1) translateY(0);
+}
+
+.winner-card.finished {
+    animation: winnerPulse 0.5s ease-in-out 3;
+}
+
+@keyframes winnerPulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
 }
 
 .winner-card-inner {
@@ -361,10 +445,10 @@ onUnmounted(() => {
     z-index: 1;
 }
 
-/* SLIDE TRANSITION */
+/* SLIDE TRANSITION - Enhanced for sequential flow */
 .slide-enter-active,
 .slide-leave-active {
-    transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease-out;
+    transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .slide-enter-from {
@@ -375,6 +459,12 @@ onUnmounted(() => {
 .slide-leave-to {
     transform: translateY(-100%);
     opacity: 0;
+}
+
+.slide-enter-to,
+.slide-leave-from {
+    transform: translateY(0);
+    opacity: 1;
 }
 
 /* RESPONSIVE */
