@@ -11,6 +11,7 @@
     <main v-else class="prediction-container">
       <div class="prediction-container-wrapper">
         <h2 class="group-title">{{ selectedMatch?.stage }}</h2>
+    <p class="post-id" v-if="selectedMatch?.post_id">Post ID: {{ selectedMatch.post_id }}</p>
 
         <div class="match-box">
           <div class="team-wrapper team-left">
@@ -40,6 +41,9 @@ import { useFetch } from '#app'
 
 const config = useRuntimeConfig()
 const { data: selectedMatch, error } = await useFetch<any>(`${config.public.apiBase}/matches/selectedmatch`)
+if (selectedMatch.value?.post_id) {
+  sessionStorage.setItem('selectedPostId', selectedMatch.value.post_id)
+}
 
 import Background from '../components/background.vue'
 import Countrybox from '../components/countrybox.vue'
