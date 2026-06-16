@@ -57,20 +57,7 @@ const winnerFromJson: Participant | null = (winnerDataFromApi?.value as any)?.wi
 // Extract data from JSON as default fallback
 let allParticipants: Participant[] = participantsData.participants || []
 
-// Fetch participants from API if endpoint is set
-if (config.public.participants) {
-    const { data: participantsFromApi } = await useFetch<any>(`${config.public.participants}/participants`)
-    if (participantsFromApi.value) {
-        const list = Array.isArray(participantsFromApi.value)
-            ? participantsFromApi.value
-            : (participantsFromApi.value.participants || [])
-        if (list.length > 0) {
-            allParticipants = list
-        }
-    }
-}
-
-// Also check if the winners endpoint response itself contains the participants list
+// Extract participants list from the single winners endpoint payload response
 if (winnerDataFromApi.value && (winnerDataFromApi.value as any).participants) {
     allParticipants = (winnerDataFromApi.value as any).participants
 }
