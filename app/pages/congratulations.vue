@@ -97,7 +97,7 @@ const winnerImage = computed(() => {
 */
 // ========== CURRENT IMPLEMENTATION USING JSON ==========
 
-const winnerName = computed(() => winnerData.value?.name || 'Winner')
+const winnerName = computed(() => winnerData.value?.name || 'No correct guess.')
 const winnerPhone = computed(() => {
     const rawPhone = winnerData.value?.mobile_number || ''
     if (!rawPhone) return ''
