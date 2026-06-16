@@ -9,7 +9,7 @@ export default defineNuxtConfig({
       appUrl: process.env.NUXT_PUBLIC_APP_URL || 'https://localhost:3000',
       assetsUrl: process.env.NUXT_PUBLIC_ASSETS_URL || '',
       participants: process.env.NUXT_PUBLIC_PARTICIPANTS_URL || '',
-      winnersEndpoint: process.env.NUXT_PUBLIC_WINNERS_ENDPOINT || 'https://api-adm.ambition.guru/worldcup-prediction/winners',
+      winnersEndpoint: process.env.NUXT_PUBLIC_WINNERS_ENDPOINT || '',
       calcServiceUrl: process.env.NUXT_PUBLIC_CALC_SERVICE_URL || '',
     }
   }
