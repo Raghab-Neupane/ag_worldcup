@@ -3,8 +3,8 @@
     <!-- White outlined card matching Figma mockup -->
     <div class="country-card">
       <div class="flag-placeholder">
-        <div v-if="flagSvg" class="flag-svg-container" v-html="flagSvg"></div>
-        <img v-else-if="customFlagImg" :src="customFlagImg" alt="flag" class="flag-img" />
+        <img v-if="customFlagImg" :src="customFlagImg" alt="flag" class="flag-img" />
+        <div v-else-if="flagSvg" class="flag-svg-container" v-html="flagSvg"></div>
         <img v-else src="" alt="flag fallback" class="flag-img" />
       </div>
     </div>
@@ -66,10 +66,20 @@ const flagSvg = computed(() => {
 })
 
 const customFlagImg = computed(() => {
-  const code = countryCode.value
+  if (!props.name) return null
+  const lowerName = props.name.toLowerCase()
   // Manually added asset because CW is missing from country-flag-icons
-  if (code === 'CW') {
+  if (lowerName === 'curacao' || lowerName === 'curaçao') {
     return '/flags/cw.svg'
+  }
+  if (lowerName === 'dr congo' || lowerName.includes('congo')) {
+    return '/flags/dr_congo.svg'
+  }
+  if (lowerName.includes('bosnia') || lowerName.includes('herzegovina')) {
+    return '/flags/bosnia_herzegovina.svg'
+  }
+  if (lowerName === 'scotland') {
+    return '/flags/scotland.svg'
   }
   return null
 })
