@@ -36,7 +36,7 @@ const formattedName = computed(() => {
 const flagUrl = computed(() => {
   if (!props.name) return ''
   let cleanName = props.name.trim().toLowerCase()
-  
+
   if (cleanName === 'curacao') {
     cleanName = 'curaçao'
   } else if (cleanName === 'dr congo' || cleanName === 'congo dr') {
@@ -50,7 +50,7 @@ const flagUrl = computed(() => {
   } else if (cleanName === 'czech republic' || cleanName === 'czechia') {
     cleanName = 'czechia'
   }
-  
+
   return `/flags/${cleanName}.png`
 })
 </script>
@@ -61,7 +61,7 @@ const flagUrl = computed(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.8rem;
+  gap: 0.7rem;
   /* reduced vertical gap */
   flex: 0 1 auto;
 }
@@ -75,7 +75,7 @@ const flagUrl = computed(() => {
   box-sizing: border-box;
   background: rgba(255, 255, 255, 0.04);
   box-shadow:
-    0 2px 18px rgba(0, 0, 0, 0.7),
+    0 2px 18px rgba(0, 0, 0, 0.3),
     inset 0 0 20px rgba(255, 255, 255, 0.1);
   overflow: hidden;
   position: relative;
@@ -84,6 +84,7 @@ const flagUrl = computed(() => {
   display: flex;
   justify-content: center;
   align-items: center;
+  margin-bottom: 2px;
 }
 
 .country-card:hover {
@@ -117,15 +118,15 @@ const flagUrl = computed(() => {
 /* Country Name styling underneath card using user's new attributes */
 .country-text {
   font-family: 'Work Sans', sans-serif;
-  font-weight: 500;
+  font-weight: 400;
 
   font-style: normal;
-  font-size: clamp(18px, 2.5vw, 38px);
+  font-size: clamp(28px, 2vw, 38px);
   line-height: 1.2;
   text-align: center;
   text-transform: uppercase;
   color: #ffffff;
-  text-shadow: 0 3px 8px rgba(0, 0, 0, 0.65);
+
   margin: 0;
 }
 
