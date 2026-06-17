@@ -23,15 +23,17 @@
                 </div>
             </div>
         </div>
-        <div v-else class="winner-card" :class="{ 'entered': hasEntered, 'finished': isFinished }">
-            <div class="winner-card-inner">
-                <div class="winner-content">
-                    <Transition name="slide" mode="out-in">
-                        <div :key="currentIndex" class="slide-item">
-                            <h4 class="winner-name">{{ currentItem.name }}</h4>
-                            <h4 class="winner-phone">{{ formatPhone(currentItem.mobile_number) }}</h4>
-                        </div>
-                    </Transition>
+        <div class="winner-placeholder" v-else>
+            <div class="winner-card" :class="{ 'entered': hasEntered, 'finished': isFinished }">
+                <div class="winner-card-inner">
+                    <div class="winner-content">
+                        <Transition name="slide" mode="out-in">
+                            <div :key="currentIndex" class="slide-item">
+                                <h4 class="winner-name">{{ currentItem.name }}</h4>
+                                <h4 class="winner-phone">{{ formatPhone(currentItem.mobile_number) }}</h4>
+                            </div>
+                        </Transition>
+                    </div>
                 </div>
             </div>
         </div>
@@ -62,37 +64,41 @@ const winnerFromJson: Participant | null = (winnerDataFromApi?.value as any)?.wi
 let allParticipants: Participant[] = participantsData.participants || []
 
 // Extract participants list from the single winners endpoint payload response
-if (winnerDataFromApi.value && (winnerDataFromApi.value as any).participants) {
-    allParticipants = (winnerDataFromApi.value as any).participants
+if (winnerDataFromApi.value) {
+    const apiVal = winnerDataFromApi.value as any
+    if (apiVal.correct_participants || apiVal.partial_participants) {
+        const correct = apiVal.correct_participants || []
+        const partial = apiVal.partial_participants || []
+        allParticipants = [...correct, ...partial]
+    } else if (apiVal.participants) {
+        allParticipants = apiVal.participants
+    }
 }
 
-// Build the scrolling array: winner at index 0, then all other participants
+// Build the scrolling array: ONLY other participants (excluding the winner)
 const scrollingList = ref<Participant[]>([])
 
 // Error handling
 const participantsError = ref<string | null>(null)
 
-// Build the list with winner first
-if (winnerFromJson) {
-    // Add winner as first element
-    scrollingList.value.push(winnerFromJson)
-
-    // Add all other participants (excluding the winner)
-    if (allParticipants.length > 0) {
+if (allParticipants.length > 0) {
+    if (winnerFromJson) {
         const otherParticipants = allParticipants.filter(
             p => p.customer_id !== winnerFromJson.customer_id
         )
-        scrollingList.value.push(...otherParticipants)
+        scrollingList.value = otherParticipants
+    } else {
+        scrollingList.value = [...allParticipants]
     }
-} else if (allParticipants.length > 0) {
-    // If no winner specified, use all participants
-    scrollingList.value = [...allParticipants]
-} else {
-    participantsError.value = 'No participants found in participants.json'
 }
 
-// Set the final winner (always the first element in scrollingList)
-const finalWinnerValue = scrollingList.value[0] || null
+// Fallback if there are no other participants (so the wheel has something to show)
+if (scrollingList.value.length === 0 && winnerFromJson) {
+    scrollingList.value = [winnerFromJson]
+}
+
+// Set the final winner directly
+const finalWinnerValue = winnerFromJson || null
 
 // Validate we have data to show
 if (scrollingList.value.length === 0) {
@@ -106,8 +112,8 @@ if (finalWinnerValue) {
 
 // ─── CONFIGURABLE TIMING FOR LOTTERY-STYLE SCROLLING ──────────────────
 const totalDuration = 18000  // 18 seconds total
-const minDelay = 20          // Fastest scroll speed (very fast at start)
-const maxDelay = 800         // Slowest scroll speed (sudden slow at end)
+const minDelay = 630          // Fastest scroll speed (very fast at start)
+const maxDelay = 900         // Slowest scroll speed (sudden slow at end)
 // ─────────────────────────────────────────────────────────────────────
 
 const currentIndex = ref(0)

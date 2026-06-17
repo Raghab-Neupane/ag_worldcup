@@ -100,6 +100,7 @@ const showWinner = () => {
 
 .choose-page.exiting .group-title {
   transform: translateY(-100px);
+  letter-spacing: -0.5px;
   opacity: 0;
 }
 
@@ -137,16 +138,16 @@ const showWinner = () => {
   flex-direction: column;
   align-items: center;
   width: 100%;
-  margin-top: 1vh;
+
 }
 
 .group-title {
   font-family: 'Work Sans', sans-serif;
   font-weight: 700;
-  font-size: clamp(14px, 3.5vw, 70px);
+  font-size: clamp(10px, 2.8vw, 50px);
   color: #ffffff;
   margin: 0 0 6vh 0;
-  letter-spacing: 2px;
+  letter-spacing: -0.5px;
   text-transform: uppercase;
   text-shadow: 0 4px 15px rgba(0, 0, 0, 0.65);
 }
@@ -155,7 +156,7 @@ const showWinner = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(1rem, 5vw, 20rem);
+  gap: clamp(1rem, 7vw, 30rem);
   width: 100%;
   max-width: 80vw;
   margin: 0 auto 5vh auto;

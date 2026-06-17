@@ -12,7 +12,7 @@
         <div class="congrats-container" :class="{ 'animate-in': animateIn }">
             <!-- Congratulations title -->
             <div class="congrats-title-wrapper">
-                <img v-if="winnerData" src="/Congratulations.png" id="winner-case" class="congrats-img">
+                <img v-if="hasWinner" src="/Congratulations.png" id="winner-case" class="congrats-img">
                 <!--fallback to the draw case in case the winner is NULL-->
                 <img v-else src="/Oops.png" id="draw-case" class="congrats-img">
             </div>
@@ -21,7 +21,6 @@
             <div class="winner-profile">
                 <img :src="winnerImage" alt="Winner photo">
                 <div class="comment">
-
                     <!--Actual comment of the winner to be displayed over here!-->
                 </div>
             </div>
@@ -29,7 +28,7 @@
             <!-- Winner name and phone -->
             <div class="winner-details">
                 <h2 class="winner-name">{{ winnerName }}</h2>
-                <h3 class="winner-phone">{{ winnerPhone }}</h3>
+                <h3 class="winner-phone" v-if="hasWinner">{{ winnerPhone }}</h3>
             </div>
         </div>
     </section>
@@ -77,7 +76,11 @@ const winnerData = ref<Winner | null>(null)
 
 watch(winnerDataFromApi, (newVal) => {
     if (newVal) {
-        winnerData.value = (newVal as any).winner || newVal
+        if ('winner' in newVal && newVal.winner === null) {
+            winnerData.value = null
+        } else {
+            winnerData.value = (newVal as any).winner || newVal
+        }
     }
 }, { immediate: true })
 // For now using JSON data, but later you can uncomment these:
@@ -103,6 +106,12 @@ const winnerImage = computed(() => {
 */
 // ========== CURRENT IMPLEMENTATION USING JSON ==========
 
+const hasWinner = computed(() => {
+    if (!winnerData.value) return false
+    const name = winnerData.value.name
+    return !!(name && name !== 'null' && name !== 'undefined');
+})
+
 const winnerName = computed(() => winnerData.value?.name || 'No correct guess.')
 const winnerPhone = computed(() => {
     const rawPhone = winnerData.value?.mobile_number || ''
@@ -116,7 +125,11 @@ const winnerImage = computed(() => {
     // Use the photo field from JSON
     const photo = winnerData.value?.photo
     if (photo && photo !== 'dummy' && photo !== 'photo' && photo !== 'null' && photo !== 'undefined') {
-        return photo
+        if (photo.startsWith('http://') || photo.startsWith('https://') || photo.startsWith('/')) {
+            return photo
+        }
+        const base = config?.public?.assetsUrl || ''
+        return base ? (base.endsWith('/') ? base + photo : base + '/' + photo) : photo
     }
     // Default profile image
     return '/profile.webp'
@@ -152,11 +165,20 @@ onMounted(async () => {
     const storedWinner = sessionStorage.getItem('winner')
     if (storedWinner) {
         const parsed = JSON.parse(storedWinner)
-        winnerData.value = parsed.winner || parsed
+        if (parsed && 'winner' in parsed && parsed.winner === null) {
+            winnerData.value = null
+        } else {
+            winnerData.value = parsed ? (parsed.winner || parsed) : null
+        }
         console.log('Winner loaded from sessionStorage:', winnerData.value)
     } else {
         if (winnerFromApi.value) {
-            winnerData.value = (winnerFromApi.value as any).winner || winnerFromApi.value
+            const val = winnerFromApi.value as any
+            if (val && 'winner' in val && val.winner === null) {
+                winnerData.value = null
+            } else {
+                winnerData.value = val ? (val.winner || val) : null
+            }
             console.log('Winner loaded from API:', winnerData.value)
         }
     }
@@ -167,108 +189,110 @@ onMounted(async () => {
     }, 100)
 
     try {
-        // Load animations from public folder
-        const confettiData = await loadAnimation('Confetti.json')
-        const fireworkData = await loadAnimation('Firework.json')
+        if (hasWinner.value) {
+            // Load animations from public folder
+            const confettiData = await loadAnimation('Confetti.json')
+            const fireworkData = await loadAnimation('Firework.json')
 
-        // Start Confetti Animation
-        if (confettiLottie.value) {
-            confettiInstance = lottie.loadAnimation({
-                container: confettiLottie.value,
-                renderer: 'svg',
-                loop: true,
-                autoplay: true,
-                animationData: confettiData
-            })
+            // Start Confetti Animation
+            if (confettiLottie.value) {
+                confettiInstance = lottie.loadAnimation({
+                    container: confettiLottie.value,
+                    renderer: 'svg',
+                    loop: true,
+                    autoplay: true,
+                    animationData: confettiData
+                })
 
-            // Stop after 4 seconds
-            setTimeout(() => {
-                if (confettiInstance) {
-                    confettiInstance.stop()
-                }
-            }, 4000)
-        }
-
-        // Start Firework Animation (Center)
-        if (fireworkLottie.value) {
-            const startFirework = () => {
-                if (fireworkLottie.value) {
-                    const firework = lottie.loadAnimation({
-                        container: fireworkLottie.value!,
-                        renderer: 'svg',
-                        loop: false,
-                        autoplay: true,
-                        animationData: fireworkData
-                    })
-                    setTimeout(() => {
-                        firework.destroy()
-                    }, 1000)
-                    return firework
-                }
-                return null
+                // Stop after 4 seconds
+                setTimeout(() => {
+                    if (confettiInstance) {
+                        confettiInstance.stop()
+                    }
+                }, 4000)
             }
 
-            // Start first firework
-            fireworkInstance = startFirework()
-
-            // Restart firework every 1.5 seconds for 4 seconds
-            let count = 0
-            const interval = setInterval(() => {
-                if (count < 3) {
-                    startFirework()
-                    count++
-                } else {
-                    clearInterval(interval)
+            // Start Firework Animation (Center)
+            if (fireworkLottie.value) {
+                const startFirework = () => {
+                    if (fireworkLottie.value) {
+                        const firework = lottie.loadAnimation({
+                            container: fireworkLottie.value!,
+                            renderer: 'svg',
+                            loop: false,
+                            autoplay: true,
+                            animationData: fireworkData
+                        })
+                        setTimeout(() => {
+                            firework.destroy()
+                        }, 1000)
+                        return firework
+                    }
+                    return null
                 }
-            }, 1500)
-            intervals.push(interval)
 
-            setTimeout(() => {
-                if (fireworkInstance) {
-                    fireworkInstance.destroy()
-                }
-            }, 10000)
-        }
+                // Start first firework
+                fireworkInstance = startFirework()
 
-        // Start Second Firework Animation (Offset)
-        if (fireworkLottie2.value) {
-            const startFirework2 = () => {
-                if (fireworkLottie2.value) {
-                    const firework2 = lottie.loadAnimation({
-                        container: fireworkLottie2.value!,
-                        renderer: 'svg',
-                        loop: false,
-                        autoplay: true,
-                        animationData: fireworkData
-                    })
-                    setTimeout(() => {
-                        firework2.destroy()
-                    }, 4000)
-                    return firework2
-                }
-                return null
+                // Restart firework every 1.5 seconds for 4 seconds
+                let count = 0
+                const interval = setInterval(() => {
+                    if (count < 3) {
+                        startFirework()
+                        count++
+                    } else {
+                        clearInterval(interval)
+                    }
+                }, 1500)
+                intervals.push(interval)
+
+                setTimeout(() => {
+                    if (fireworkInstance) {
+                        fireworkInstance.destroy()
+                    }
+                }, 10000)
             }
 
-            // Start first firework
-            firework2Instance = startFirework2()
-
-            // Restart second firework every 1.8 seconds
-            let count = 0
-            const interval2 = setInterval(() => {
-                if (count < 2) {
-                    startFirework2()
-                    count++
-                } else {
-                    clearInterval(interval2)
+            // Start Second Firework Animation (Offset)
+            if (fireworkLottie2.value) {
+                const startFirework2 = () => {
+                    if (fireworkLottie2.value) {
+                        const firework2 = lottie.loadAnimation({
+                            container: fireworkLottie2.value!,
+                            renderer: 'svg',
+                            loop: false,
+                            autoplay: true,
+                            animationData: fireworkData
+                        })
+                        setTimeout(() => {
+                            firework2.destroy()
+                        }, 4000)
+                        return firework2
+                    }
+                    return null
                 }
-            }, 1800)
-            intervals.push(interval2)
 
-            setTimeout(() => {
-                if (firework2Instance) {
-                    firework2Instance.destroy()
-                }
-            }, 4000)
+                // Start first firework
+                firework2Instance = startFirework2()
+
+                // Restart second firework every 1.8 seconds
+                let count = 0
+                const interval2 = setInterval(() => {
+                    if (count < 2) {
+                        startFirework2()
+                        count++
+                    } else {
+                        clearInterval(interval2)
+                    }
+                }, 1800)
+                intervals.push(interval2)
+
+                setTimeout(() => {
+                    if (firework2Instance) {
+                        firework2Instance.destroy()
+                    }
+                }, 4000)
+            }
         }
     } catch (error) {
         console.error('Error loading animations:', error)
@@ -379,6 +403,10 @@ onUnmounted(() => {
     max-width: 85vw;
     object-fit: contain;
     filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+#draw-case {
+    height: clamp(70px, 11vh, 140px);
 }
 
 /* Winner profile */
