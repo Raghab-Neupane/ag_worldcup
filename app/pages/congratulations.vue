@@ -12,12 +12,18 @@
         <div class="congrats-container" :class="{ 'animate-in': animateIn }">
             <!-- Congratulations title -->
             <div class="congrats-title-wrapper">
-                <img src="/Congratulations.png" class="congrats-img">
+                <img v-if="winnerData" src="/Congratulations.png" id="winner-case" class="congrats-img">
+                <!--fallback to the draw case in case the winner is NULL-->
+                <img v-else src="/Oops.png" id="draw-case" class="congrats-img">
             </div>
 
             <!-- Winner profile photo -->
             <div class="winner-profile">
                 <img :src="winnerImage" alt="Winner photo">
+                <div class="comment">
+
+                    <!--Actual comment of the winner to be displayed over here!-->
+                </div>
             </div>
 
             <!-- Winner name and phone -->

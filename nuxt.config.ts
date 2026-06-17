@@ -2,6 +2,9 @@
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
+  devServer: {
+    port: 9000
+  },
   ssr: false, // Disable Server-Side Rendering globally to resolve Cloudflare-to-Cloudflare fetch routing blocks
   runtimeConfig: {
     public: {
