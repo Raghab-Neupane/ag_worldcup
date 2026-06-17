@@ -3,8 +3,7 @@
     <!-- White outlined card matching Figma mockup -->
     <div class="country-card">
       <div class="flag-placeholder">
-        <img v-if="customFlagImg" :src="customFlagImg" alt="flag" class="flag-img" />
-        <div v-else-if="flagSvg" class="flag-svg-container" v-html="flagSvg"></div>
+        <img v-if="flagUrl" :src="flagUrl" alt="flag" class="flag-img" />
         <img v-else src="" alt="flag fallback" class="flag-img" />
       </div>
     </div>
@@ -15,12 +14,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import countries from 'i18n-iso-countries'
-import enLocale from 'i18n-iso-countries/langs/en.json'
-import * as flags from 'country-flag-icons/string/3x2'
-
-// Initialize the iso countries language
-countries.registerLocale(enLocale)
 
 const props = defineProps({
   name: {
@@ -40,48 +33,25 @@ const formattedName = computed(() => {
   return props.name
 })
 
-const countryCode = computed(() => {
-  if (!props.name) return null;
-
-  // Convert country name to ISO alpha-2 code
-  let code = countries.getAlpha2Code(props.name, 'en')
-
-  // Custom fallbacks for common alternative names that might come from the API
-  const lowerName = props.name.toLowerCase()
-  if (lowerName === 'usa' || lowerName === 'united states') code = 'US'
-  if (lowerName === 'uk' || lowerName === 'england') code = 'GB'
-  if (lowerName === 'south korea') code = 'KR'
-  // Register Curaçao mapping
-  if (lowerName === 'curacao' || lowerName === 'curaçao') code = 'CW'
-
-  return code
-})
-
-const flagSvg = computed(() => {
-  const code = countryCode.value
-  if (code && (flags as any)[code]) {
-    return (flags as any)[code]
+const flagUrl = computed(() => {
+  if (!props.name) return ''
+  let cleanName = props.name.trim().toLowerCase()
+  
+  if (cleanName === 'curacao') {
+    cleanName = 'curaçao'
+  } else if (cleanName === 'dr congo' || cleanName === 'congo dr') {
+    cleanName = 'congo dr'
+  } else if (cleanName.includes('bosnia') || cleanName.includes('herzegovina')) {
+    cleanName = 'bosnia and herzegovina'
+  } else if (cleanName === 'ivory coast' || cleanName === 'ivory cost' || cleanName.includes('ivoire')) {
+    cleanName = "cote d'ivoire"
+  } else if (cleanName === 'cape verde' || cleanName === 'cabo verde') {
+    cleanName = 'cabo verde'
+  } else if (cleanName === 'czech republic' || cleanName === 'czechia') {
+    cleanName = 'czechia'
   }
-  return null
-})
-
-const customFlagImg = computed(() => {
-  if (!props.name) return null
-  const lowerName = props.name.toLowerCase()
-  // Manually added asset because CW is missing from country-flag-icons
-  if (lowerName === 'curacao' || lowerName === 'curaçao') {
-    return '/flags/cw.svg'
-  }
-  if (lowerName === 'dr congo' || lowerName.includes('congo')) {
-    return '/flags/dr_congo.svg'
-  }
-  if (lowerName.includes('bosnia') || lowerName.includes('herzegovina')) {
-    return '/flags/bosnia_herzegovina.svg'
-  }
-  if (lowerName === 'scotland') {
-    return '/flags/scotland.svg'
-  }
-  return null
+  
+  return `/flags/${cleanName}.png`
 })
 </script>
 
