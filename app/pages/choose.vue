@@ -1,6 +1,10 @@
 <template>
   <div class="choose-page" :class="{ 'exiting': isExiting }">
 
+    <Transition name="fade">
+      <IntroTransition v-if="showIntro" />
+    </Transition>
+
     <Background />
 
 
@@ -19,6 +23,9 @@
 
           <div class="vs-container">
             <img src="/vs.svg" alt="vs" class="vs-svg" />
+            <img src="/animations/spark1.gif" class="ani1" alt="">
+            <img src="/animations/spark2.gif" class="ani2" alt="">
+            <img src="/animations/electric.gif" class="ani3" alt="">
           </div>
 
           <div class="team-wrapper team-right">
@@ -35,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useFetch } from '#app'
 
 const config = useRuntimeConfig()
@@ -45,11 +52,19 @@ if (selectedMatch.value?.post_id) {
 }
 
 import Background from '../components/background.vue'
+import IntroTransition from '../components/transition.vue'
 import Countrybox from '../components/countrybox.vue'
 import ViewWinnerButton from '../components/button.vue'
 import { goToWinner } from '../router/router'
 
 const isExiting = ref(false)
+const showIntro = ref(true)
+
+onMounted(() => {
+  setTimeout(() => {
+    showIntro.value = false
+  }, 1000) // matches the scroll-up animation timing
+})
 
 const showWinner = () => {
   isExiting.value = true
@@ -60,12 +75,22 @@ const showWinner = () => {
 </script>
 
 <style scoped>
+/* Fade transition for the Intro component */
+.fade-leave-active {
+  transition: opacity 2.5s ease-in-out;
+}
+
+.fade-leave-to {
+  opacity: 0;
+}
+
 .choose-page {
   position: relative;
   width: 100%;
   min-height: 100vh;
   overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 /* ========== EXIT ANIMATIONS — SLOWER ========== */
@@ -118,6 +143,21 @@ const showWinner = () => {
   width: 100%;
   box-sizing: border-box;
   padding: 33vh 4vw 5vh;
+  opacity: 0;
+  animation: fadeInContent 0.8s ease-out forwards;
+  animation-delay: 1.6s;
+}
+
+@keyframes fadeInContent {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .prediction-container-wrapper {
@@ -157,17 +197,53 @@ const showWinner = () => {
 }
 
 .vs-container {
+  position: relative;
   width: clamp(60px, 10vw, 500px);
-  height: 0px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.5));
+
 }
 
-.vs-container img {
+.vs-svg {
+  position: relative;
+  z-index: 2;
   height: clamp(80px, 15vw, 800px);
+  width: auto;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.ani1,
+.ani2,
+.ani3 {
+  position: absolute;
+  top: 50%;
+  opacity: 0.8;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+.ani1 {
+  width: 170%;
+  left: 50%;
+  height: auto;
+}
+
+.ani2 {
+  width: 260%;
+  left: 90%;
+  top: 30%;
+  height: auto;
+}
+
+.ani3 {
+  width: 150%;
+  left: 90%;
+  top: 30%;
+  height: auto;
 }
 
 .button-wrapper {
@@ -208,7 +284,7 @@ const showWinner = () => {
     height: auto;
   }
 
-  .vs-container img {
+  .vs-container .vs-svg {
     height: 100px;
   }
 
@@ -305,6 +381,20 @@ const showWinner = () => {
     border-radius: 48px;
     border-width: 8px;
     box-shadow: 0 35px 75px rgba(0, 0, 0, 0.4);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.12);
+  }
+
+  100% {
+    transform: scale(1);
   }
 }
 </style>
