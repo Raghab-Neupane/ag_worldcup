@@ -93,7 +93,7 @@ const maskedPhone = computed(() => {
     height: 100%;
     border-radius: 16px;
 
-    padding: 6px;
+    padding: 16px;
     background: linear-gradient(135deg, #ffd700 0%, #ff8c00 50%, #ff6b00 100%);
 }
 
