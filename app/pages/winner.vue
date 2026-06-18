@@ -3,7 +3,6 @@
         <Background />
 
         <div class="reel-stage entered">
-            <!-- center marker showing which card is "selected" -->
             <div class="center-marker" :style="markerStyle"></div>
 
             <div class="reel-track" :style="trackStyle">
@@ -12,6 +11,14 @@
                 </div>
             </div>
         </div>
+
+        <!-- winner showcase, revealed once the reel settles -->
+        <Transition name="fade">
+            <div v-if="showWinnerCard && winner" class="winner-showcase">
+                <p class="winner-label">Winner</p>
+                <h2 class="winner-name">{{ winner.name }}</h2>
+            </div>
+        </Transition>
     </section>
 </template>
 
@@ -21,16 +28,29 @@ import Background from '../components/background.vue'
 import Card from '../components/card.vue'
 
 // ─── CONFIGURABLE TIMING FOR LOTTERY-STYLE CARD REEL ──────────────────
-const totalDuration = 6000      // total scroll duration in ms
-const minDelay = 90             // fastest step delay (very fast at start)
-const maxDelay = 650             // slowest step delay (dramatic slowdown at end)
-const cardGap = 16               // visible gap between cards in the row, in px
-const CARD_COUNT = 40            // how many cards make up the reel
+const totalDuration = 6000
+const minDelay = 90
+const maxDelay = 650
+const cardGap = 16
+const CARD_COUNT = 7
 // ─────────────────────────────────────────────────────────────────────
 
-// Card size is responsive: a fraction of viewport width, clamped between
-// a sensible min/max, with height derived from the same aspect ratio as
-// the Figma export (337.94 : 485.79).
+// ─── WINNER FETCH ───────────────────────────────────────────────────
+const BASE_URL = '' // TODO: set your API base URL here
+const winner = ref<{ name: string;[key: string]: any } | null>(null)
+const showWinnerCard = ref(false)
+
+const fetchWinner = async () => {
+    try {
+        const res = await fetch(`${BASE_URL}/winner`)
+        if (!res.ok) throw new Error(`Request failed: ${res.status}`)
+        winner.value = await res.json()
+    } catch (err) {
+        console.error('Failed to fetch winner:', err)
+    }
+}
+// ─────────────────────────────────────────────────────────────────────
+
 const ASPECT_RATIO = 485.79 / 337.94
 const MIN_CARD_WIDTH = 130
 const MAX_CARD_WIDTH = 260
@@ -45,26 +65,27 @@ const cardSizeVars = computed(() => ({
 }))
 
 const updateCardWidth = () => {
-    // roughly one-fifth of the viewport per card, clamped to a usable range
     const target = window.innerWidth / 5.5
     cardWidth.value = Math.min(MAX_CARD_WIDTH, Math.max(MIN_CARD_WIDTH, target))
 }
 
-const winningSlotIndex = ref(Math.floor(CARD_COUNT * 0.7)) // which slot the reel lands on
+const winningSlotIndex = ref(Math.floor(CARD_COUNT * 0.7))
 
 const trackOffset = ref(0)
 const trackStyle = computed(() => ({
-    transform: `translateX(${trackOffset.value}px)`
+    transform: `translateX(${trackOffset.value}px)`,
+    transition: isAnimating.value ? 'none' : 'transform 0.3s ease-out'
 }))
 const slotStyle = computed(() => ({ marginRight: `${cardGap}px` }))
 const markerStyle = computed(() => ({ width: `${cardWidth.value}px` }))
+
+const isAnimating = ref(false)
 
 const centerSlot = (slotIndex: number) => {
     const viewportCenter = window.innerWidth / 2
     trackOffset.value = viewportCenter - (slotIndex * slotWidth.value) - (cardWidth.value / 2)
 }
 
-// Easing: fast scroll for most of the duration, then a dramatic slowdown at the end
 const easeOutBack = (x: number): number => {
     const c1 = 1.70158
     const c3 = c1 + 1
@@ -87,8 +108,10 @@ const calculateDelay = (progress: number): number => {
 
 let timeoutId: ReturnType<typeof setTimeout> | null = null
 let currentSlot = 0
+let animationFrameId: number | null = null
 
 const startScrollAnimation = () => {
+    isAnimating.value = true
     const startTimeRef = Date.now()
     currentSlot = 0
     centerSlot(0)
@@ -99,10 +122,15 @@ const startScrollAnimation = () => {
         if (elapsed >= totalDuration || currentSlot >= winningSlotIndex.value) {
             if (timeoutId) clearTimeout(timeoutId)
             timeoutId = null
+            isAnimating.value = false
 
-            // Snap exactly onto the selected slot
             currentSlot = winningSlotIndex.value
             centerSlot(currentSlot)
+
+            // reveal winner info after the snap settles
+            setTimeout(() => {
+                showWinnerCard.value = true
+            }, 400)
             return
         }
 
@@ -120,7 +148,7 @@ const startScrollAnimation = () => {
 
 let onResize: (() => void) | null = null
 
-onMounted(() => {
+onMounted(async () => {
     updateCardWidth()
     centerSlot(0)
 
@@ -130,12 +158,13 @@ onMounted(() => {
     }
     window.addEventListener('resize', onResize)
 
-    // Start immediately on load, no click/interaction required
+    await fetchWinner()
     startScrollAnimation()
 })
 
 onUnmounted(() => {
     if (timeoutId) clearTimeout(timeoutId)
+    if (animationFrameId) cancelAnimationFrame(animationFrameId)
     if (onResize) window.removeEventListener('resize', onResize)
 })
 </script>
@@ -146,12 +175,12 @@ onUnmounted(() => {
     width: 100%;
     min-height: 100vh;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     overflow: hidden;
 }
 
-/* ─── REEL STAGE ─────────────────────────────────────────────── */
 .reel-stage {
     position: relative;
     z-index: 5;
@@ -184,5 +213,42 @@ onUnmounted(() => {
 
 .reel-slot {
     flex: 0 0 auto;
+}
+
+/* ─── WINNER SHOWCASE ─────────────────────────────────────────── */
+.winner-showcase {
+    position: relative;
+    z-index: 5;
+    margin-top: 24px;
+    text-align: center;
+}
+
+.winner-label {
+    font-size: 14px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.6);
+    margin: 0 0 4px;
+}
+
+.winner-name {
+    font-size: 28px;
+    font-weight: 700;
+    color: #ffd84d;
+    margin: 0;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.fade-enter-from {
+    opacity: 0;
+    transform: translateY(8px);
+}
+
+.fade-leave-to {
+    opacity: 0;
 }
 </style>
