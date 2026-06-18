@@ -1,6 +1,6 @@
 <template>
-    <section class="congratulations-page">
-        <Background />
+    <section class="congratulations-page" :class="{ 'overlay-mode': isOverlay }">
+        <Background v-if="!isOverlay" />
 
         <!-- Lottie Animations Container -->
         <div class="animations-container">
@@ -12,24 +12,33 @@
         <div class="congrats-container" :class="{ 'animate-in': animateIn }">
             <!-- Congratulations title -->
             <div class="congrats-title-wrapper">
-                <img v-if="hasWinner" src="/Congratulations.png" id="winner-case" class="congrats-img">
-                <!--fallback to the draw case in case the winner is NULL-->
-                <img v-else src="/Oops.png" id="draw-case" class="congrats-img">
+                <img v-if="hasWinner" src="/Congratulations.png" id="winner-case" class="congrats-img" />
+                <img v-else src="/Oops.png" id="draw-case" class="congrats-img" />
             </div>
 
-            <!-- Winner profile photo -->
-            <div class="winner-profile">
-                <img :src="winnerImage" alt="Winner photo">
-                <div class="comment">
-                    <!--Actual comment of the winner to be displayed over here!-->
+            <!-- Winner card, standing on the stage, framed by the gold wreath -->
+            <div class="stage-wrapper" v-if="hasWinner" :style="stageStyle">
+                <img src="/stage.png" alt="Stage" class="stage-image" />
+                <img src="/crops.png" alt="Crop" class="crop-image" />
+            </div>
+
+            <!-- Draw/Oops Fallback Case -->
+            <div class="draw-container" v-else>
+                <div class="winner-profile">
+                    <img :src="winnerImage" @error="handleImageError" alt="Winner photo" />
+                </div>
+                <div class="winner-details">
+                    <h2 class="winner-name">{{ winnerName }}</h2>
+                    <h3 class="winner-phone">{{ winnerPhone }}</h3>
                 </div>
             </div>
+        </div>
 
-            <!-- Winner name and phone -->
-            <div class="winner-details">
-                <h2 class="winner-name">{{ winnerName }}</h2>
-                <h3 class="winner-phone" v-if="hasWinner">{{ winnerPhone }}</h3>
-            </div>
+        <div class="footer">
+            <img src="/bl.png" />
+            <img src="/mid.png" />
+            <img src="/br.png" />
+            <div class="footer-text">🏆 THANK YOU FOR PARTICIPATING! 🏆</div>
         </div>
     </section>
 </template>
@@ -38,7 +47,12 @@
 import { computed, onMounted, ref, onUnmounted, watch } from 'vue'
 import lottie from 'lottie-web'
 import Background from '../components/background.vue'
-// import participantsData from '../../participants.json' // Deprecated, using API endpoint
+
+const props = withDefaults(defineProps<{
+    isOverlay?: boolean
+}>(), {
+    isOverlay: false
+})
 
 interface Winner {
     customer_id: string
@@ -52,64 +66,61 @@ const animateIn = ref(false)
 let confettiInstance: any = null
 let fireworkInstance: any = null
 let firework2Instance: any = null
-let intervals: number[] = []
+const intervals: number[] = []
 
-// Get winner data from sessionStorage (passed from winner.vue) or from JSON
-// const winnerData = ref<Winner | null>(null) // Removed duplicate, using later declaration
-
-// Lottie refs
 const confettiLottie = ref<HTMLDivElement | null>(null)
 const fireworkLottie = ref<HTMLDivElement | null>(null)
 const fireworkLottie2 = ref<HTMLDivElement | null>(null)
 
-// ========== ENDPOINT PREPARED FOR LATER USE ==========
+// ─── Responsive card size (same as winner page) ──────────────
+const ASPECT_RATIO = 485.79 / 337.94
+const MIN_CARD_WIDTH = 180
+const MAX_CARD_WIDTH = 300
+
+const cardWidth = ref(220)
+const cardHeight = computed(() => cardWidth.value * ASPECT_RATIO)
+
+const cardSizeVars = computed(() => ({
+    '--card-width': `${cardWidth.value}px`,
+    '--card-height': `${cardHeight.value}px`
+}))
+
+// Stage wrapper style: scales with card width, keeping proportions
+const stageStyle = computed(() => ({
+    width: `${cardWidth.value * 1.5}px`,   // stage wider than card
+    height: `${cardHeight.value * 1.25}px`, // enough space for card + stage elements
+    maxWidth: '460px',
+    margin: '0 auto'
+}))
+
+const updateCardWidth = () => {
+    const target = window.innerWidth / 6.5
+    cardWidth.value = Math.min(MAX_CARD_WIDTH, Math.max(MIN_CARD_WIDTH, target))
+}
+
+// ─── Winner data ───────────────────────────────────────────────
 const config = useRuntimeConfig()
-// Retrieve post_id from sessionStorage (set in choose page)
 const postId = sessionStorage.getItem('selectedPostId')
-// Fetch winner data dynamically using post_id
 const { data: winnerDataFromApi } = await useFetch<Winner>(
     `${config.public.winnersEndpoint}?post_id=${postId}`
 )
-// No config needed for dummy link
-// Use API data if available, otherwise fallback to sessionStorage or JSON
+
 const winnerData = ref<Winner | null>(null)
 
 watch(winnerDataFromApi, (newVal) => {
     if (newVal) {
-        if ('winner' in newVal && newVal.winner === null) {
+        if (typeof newVal === 'object' && 'winner' in newVal && (newVal as any).winner === null) {
             winnerData.value = null
         } else {
-            winnerData.value = (newVal as any).winner || newVal
+            winnerData.value = typeof newVal === 'object' ? ((newVal as any).winner || newVal) : null
         }
     }
 }, { immediate: true })
-// For now using JSON data, but later you can uncomment these:
-/*
-const config = useRuntimeConfig()
-const { data: selectedMatch } = await useFetch<any>(`${config.public.apiBase}/matches/selectedmatch`)
-const { data: participants } = await useFetch<any[]>(`${config.public.participants}/participants`)
-
-const winnerName = computed(() => selectedMatch.value?.winner || '_')
-const winnerPhone = computed(() => {
-    const rawPhone = selectedMatch.value?.phone || '_'
-    if (rawPhone === '98******67' || rawPhone === '_') return rawPhone
-    const p = rawPhone.trim()
-    if (p.length <= 4) return p
-    return p.slice(0, 2) + '*'.repeat(p.length - 4) + p.slice(-2)
-})
-
-const winnerImage = computed(() => {
-    const base = config.public.assetsUrl || ''
-    const participant = participants.value?.find(p => p.name === winnerName.value)
-    return participant?.image ? base + '/' + participant.image : base + '/profile.webp'
-})
-*/
-// ========== CURRENT IMPLEMENTATION USING JSON ==========
 
 const hasWinner = computed(() => {
     if (!winnerData.value) return false
     const name = winnerData.value.name
-    return !!(name && name !== 'null' && name !== 'undefined');
+    return !!(name && name !== 'null' && name !== 'undefined')
 })
 
 const winnerName = computed(() => winnerData.value?.name || 'No correct guess.')
@@ -122,7 +133,6 @@ const winnerPhone = computed(() => {
 })
 
 const winnerImage = computed(() => {
-    // Use the photo field from JSON
     const photo = winnerData.value?.photo
     if (photo && photo !== 'dummy' && photo !== 'photo' && photo !== 'null' && photo !== 'undefined') {
         if (photo.startsWith('http://') || photo.startsWith('https://') || photo.startsWith('/')) {
@@ -131,18 +141,19 @@ const winnerImage = computed(() => {
         const base = config?.public?.assetsUrl || ''
         return base ? (base.endsWith('/') ? base + photo : base + '/' + photo) : photo
     }
-    // Default profile image
     return '/profile.webp'
 })
 
-// Helper function to load animation from public folder
+const handleImageError = (event: Event) => {
+    (event.target as HTMLImageElement).src = '/profile.svg'
+}
+
+// ─── Load Lottie animations ──────────────────────────────────
 const loadAnimation = (fileName: string) => {
     return new Promise((resolve, reject) => {
         fetch(`/animations/${fileName}`)
             .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Failed to load ${fileName}`)
-                }
+                if (!response.ok) throw new Error(`Failed to load ${fileName}`)
                 return response.json()
             })
             .then(data => resolve(data))
@@ -151,50 +162,32 @@ const loadAnimation = (fileName: string) => {
 }
 
 onMounted(async () => {
-    const config = useRuntimeConfig()
-    // Fetch participants list from dummy endpoint
-    const { data: participantsFromApi } = await useFetch<any[]>(
-        `${config.public.dummyLink}/participants`
-    )
-    // Fetch winner from dummy endpoint
-    const { data: winnerFromApi } = await useFetch<Winner>(
-        `${config.public.dummyLink}/winners`
-    )
+    updateCardWidth()
+    window.addEventListener('resize', updateCardWidth)
 
-    // Retrieve winner data from sessionStorage first
-    const storedWinner = sessionStorage.getItem('winner')
-    if (storedWinner) {
-        const parsed = JSON.parse(storedWinner)
-        if (parsed && 'winner' in parsed && parsed.winner === null) {
-            winnerData.value = null
-        } else {
-            winnerData.value = parsed ? (parsed.winner || parsed) : null
-        }
-        console.log('Winner loaded from sessionStorage:', winnerData.value)
-    } else {
-        if (winnerFromApi.value) {
-            const val = winnerFromApi.value as any
-            if (val && 'winner' in val && val.winner === null) {
+    // Load winner from sessionStorage fallback only if API didn't return one
+    if (!winnerData.value) {
+        const storedWinner = sessionStorage.getItem('winner')
+        if (storedWinner) {
+            const parsed = JSON.parse(storedWinner)
+            if (parsed && typeof parsed === 'object' && 'winner' in parsed && parsed.winner === null) {
                 winnerData.value = null
             } else {
-                winnerData.value = val ? (val.winner || val) : null
+                winnerData.value = parsed && typeof parsed === 'object' ? (parsed.winner || parsed) : null
             }
-            console.log('Winner loaded from API:', winnerData.value)
         }
     }
 
     // Trigger entrance animation
-    setTimeout(() => {
-        animateIn.value = true
-    }, 100)
+    setTimeout(() => { animateIn.value = true }, 100)
 
     try {
         if (hasWinner.value) {
-            // Load animations from public folder
-            const confettiData = await loadAnimation('Confetti.json')
-            const fireworkData = await loadAnimation('Firework.json')
+            const [confettiData, fireworkData] = await Promise.all([
+                loadAnimation('Confetti.json'),
+                loadAnimation('Firework.json')
+            ])
 
-            // Start Confetti Animation
             if (confettiLottie.value) {
                 confettiInstance = lottie.loadAnimation({
                     container: confettiLottie.value,
@@ -203,95 +196,24 @@ onMounted(async () => {
                     autoplay: true,
                     animationData: confettiData
                 })
-
-                // Stop after 4 seconds
-                setTimeout(() => {
-                    if (confettiInstance) {
-                        confettiInstance.stop()
-                    }
-                }, 4000)
             }
-
-            // Start Firework Animation (Center)
             if (fireworkLottie.value) {
-                const startFirework = () => {
-                    if (fireworkLottie.value) {
-                        const firework = lottie.loadAnimation({
-                            container: fireworkLottie.value!,
-                            renderer: 'svg',
-                            loop: false,
-                            autoplay: true,
-                            animationData: fireworkData
-                        })
-                        setTimeout(() => {
-                            firework.destroy()
-                        }, 1000)
-                        return firework
-                    }
-                    return null
-                }
-
-                // Start first firework
-                fireworkInstance = startFirework()
-
-                // Restart firework every 1.5 seconds for 4 seconds
-                let count = 0
-                const interval = setInterval(() => {
-                    if (count < 3) {
-                        startFirework()
-                        count++
-                    } else {
-                        clearInterval(interval)
-                    }
-                }, 1500)
-                intervals.push(interval)
-
-                setTimeout(() => {
-                    if (fireworkInstance) {
-                        fireworkInstance.destroy()
-                    }
-                }, 10000)
+                fireworkInstance = lottie.loadAnimation({
+                    container: fireworkLottie.value,
+                    renderer: 'svg',
+                    loop: true,
+                    autoplay: true,
+                    animationData: fireworkData
+                })
             }
-
-            // Start Second Firework Animation (Offset)
             if (fireworkLottie2.value) {
-                const startFirework2 = () => {
-                    if (fireworkLottie2.value) {
-                        const firework2 = lottie.loadAnimation({
-                            container: fireworkLottie2.value!,
-                            renderer: 'svg',
-                            loop: false,
-                            autoplay: true,
-                            animationData: fireworkData
-                        })
-                        setTimeout(() => {
-                            firework2.destroy()
-                        }, 4000)
-                        return firework2
-                    }
-                    return null
-                }
-
-                // Start first firework
-                firework2Instance = startFirework2()
-
-                // Restart second firework every 1.8 seconds
-                let count = 0
-                const interval2 = setInterval(() => {
-                    if (count < 2) {
-                        startFirework2()
-                        count++
-                    } else {
-                        clearInterval(interval2)
-                    }
-                }, 1800)
-                intervals.push(interval2)
-
-                setTimeout(() => {
-                    if (firework2Instance) {
-                        firework2Instance.destroy()
-                    }
-                }, 4000)
+                firework2Instance = lottie.loadAnimation({
+                    container: fireworkLottie2.value,
+                    renderer: 'svg',
+                    loop: true,
+                    autoplay: true,
+                    animationData: fireworkData
+                })
             }
         }
     } catch (error) {
@@ -300,18 +222,11 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-    // Clean up animations
-    if (confettiInstance) {
-        confettiInstance.destroy()
-    }
-    if (fireworkInstance) {
-        fireworkInstance.destroy()
-    }
-    if (firework2Instance) {
-        firework2Instance.destroy()
-    }
-    // Clear all intervals
-    intervals.forEach(interval => clearInterval(interval))
+    window.removeEventListener('resize', updateCardWidth)
+    confettiInstance?.destroy()
+    fireworkInstance?.destroy()
+    firework2Instance?.destroy()
+    intervals.forEach(clearInterval)
 })
 </script>
 
@@ -329,7 +244,17 @@ onUnmounted(() => {
     box-sizing: border-box;
 }
 
-/* Lottie Animations Container */
+.congratulations-page.overlay-mode {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    z-index: 15;
+}
+
+/* ─── Lottie animations ─────────────────────────────────────── */
 .animations-container {
     position: fixed;
     top: 0;
@@ -356,73 +281,236 @@ onUnmounted(() => {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 400px;
-    height: 400px;
+    width: min(50vw, 500px);
+    height: min(50vw, 500px);
 }
 
 .firework-lottie-2 {
-    top: 30%;
-    left: 20%;
-    width: 300px;
-    height: 300px;
+    top: 20%;
+    left: 10%;
+    width: min(30vw, 300px);
+    height: min(30vw, 300px);
 }
 
-/* Main Container Animation */
+/* ─── Main container ─────────────────────────────────────────── */
 .congrats-container {
     position: relative;
     z-index: 15;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: flex-end;
+    margin-top: 52px;
     text-align: center;
     width: 90vw;
     max-width: 1200px;
-    gap: clamp(16px, 2.5vh, 32px);
-    margin-top: 17vh;
+    height: 100vh;
+    gap: clamp(20px, 4vh, 60px);
+    padding: clamp(140px, 18vh, 220px) 0 clamp(100px, 12vh, 160px);
+    box-sizing: border-box;
     opacity: 0;
-    transform: scale(0.8);
-    transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity 0.8s ease-out;
 }
 
 .congrats-container.animate-in {
     opacity: 1;
-    transform: scale(1);
 }
 
-/* Congratulations title */
 .congrats-title-wrapper {
+    position: absolute;
+    top: calc(11vh + clamp(60px, 8vw, 150px));
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     justify-content: center;
     align-items: center;
-    margin-bottom: clamp(8px, 1.5vh, 20px);
+    z-index: 10;
 }
 
 .congrats-img {
-    height: clamp(100px, 16vh, 220px);
-    width: auto;
+    width: clamp(180px, 30vw, 550px);
+    height: auto;
     max-width: 85vw;
     object-fit: contain;
     filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
 }
 
 #draw-case {
-    height: clamp(70px, 11vh, 140px);
+    width: clamp(120px, 18vw, 300px);
 }
 
-/* Winner profile */
+/* ─── Stage + card composition ──────────────────────────────── */
+.stage-wrapper {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    width: 100%;
+    max-width: 460px;
+    height: calc(var(--card-height, 300px) * 1.25);
+    margin: 0 auto;
+}
+
+.stage-image {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 380px;
+    height: auto;
+    display: block;
+    filter: drop-shadow(0 6px 15px rgba(0, 0, 0, 0.45));
+}
+
+.crop-image {
+    position: absolute;
+    z-index: 2;
+    left: 50%;
+    bottom: 10%;
+    width: 130%;
+    max-width: 480px;
+    height: auto;
+    transform: translateX(-50%);
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.15));
+}
+
+.winner-card-el {
+    position: absolute;
+    z-index: 3;
+    left: 50%;
+    bottom: 8%;
+    width: var(--card-width);
+    height: var(--card-height);
+    transform: translateX(-50%);
+    filter: drop-shadow(0 10px 18px rgba(225, 117, 10, 0.5));
+}
+
+/* ─── Footer ─────────────────────────────────────────────────── */
+.footer {
+    position: absolute;
+    bottom: clamp(15px, 3.5vh, 45px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: clamp(280px, 55vw, 750px);
+    z-index: 20;
+}
+
+.footer img {
+    height: clamp(26px, 4.5vh, 50px);
+    display: block;
+    object-fit: fill;
+}
+
+.footer img[src*="bl.png"],
+.footer img[src*="br.png"] {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+.footer img[src*="mid.png"] {
+    flex: 1 1 0;
+    width: 0;
+}
+
+.footer-text {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 25;
+    color: #ffffff;
+    font-family: 'Work Sans', sans-serif;
+    font-weight: 400;
+    font-size: clamp(11px, 1.2vw, 24px);
+    letter-spacing: clamp(1px, 0.1vw, 2px);
+    white-space: nowrap;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+    pointer-events: none;
+}
+
+/* ─── Responsive fine‑tuning ────────────────────────────────── */
+@media (max-width: 768px) {
+    .congrats-container {
+        gap: clamp(8px, 1.5vh, 12px);
+        padding-top: clamp(40px, 8vh, 80px);
+    }
+
+    .congrats-img {
+        width: clamp(140px, 35vw, 220px);
+    }
+
+    .stage-wrapper {
+        max-width: 280px;
+    }
+
+    .stage-image {
+        max-width: 240px;
+    }
+
+    .crop-image {
+        max-width: 300px;
+        bottom: 6%;
+    }
+
+    .winner-card-el {
+        bottom: 4%;
+    }
+
+    .firework-lottie {
+        width: 40vw;
+        height: 40vw;
+    }
+
+    .firework-lottie-2 {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .congrats-img {
+        width: clamp(100px, 40vw, 160px);
+    }
+
+    .stage-wrapper {
+        max-width: 200px;
+    }
+
+    .stage-image {
+        max-width: 180px;
+    }
+
+    .crop-image {
+        max-width: 220px;
+    }
+
+    .firework-lottie {
+        width: 50vw;
+        height: 50vw;
+    }
+}
+
+/* Draw/Oops Fallback Case Styles */
+.draw-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(15px, 3vh, 35px);
+}
+
 .winner-profile {
-    width: clamp(130px, 16vh, 240px);
-    height: clamp(130px, 16vh, 240px);
+    width: clamp(140px, 20vh, 220px);
+    height: clamp(140px, 20vh, 220px);
     border-radius: 20px;
     border: 4px solid #ffffff;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
     overflow: hidden;
     display: flex;
     justify-content: center;
     align-items: center;
     background: #1a1a1a;
     flex-shrink: 0;
-    transition: transform 0.3s ease;
 }
 
 .winner-profile img {
@@ -431,36 +519,16 @@ onUnmounted(() => {
     object-fit: cover;
 }
 
-.congrats-container.animate-in .winner-profile {
-    animation: profilePop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both;
-}
-
-@keyframes profilePop {
-    0% {
-        transform: scale(0);
-        opacity: 0;
-    }
-
-    50% {
-        transform: scale(1.1);
-    }
-
-    100% {
-        transform: scale(1);
-        opacity: 1;
-    }
-}
-
-/* Winner details */
 .winner-details {
     display: flex;
     flex-direction: column;
     gap: clamp(6px, 1vh, 14px);
+    align-items: center;
 }
 
 .winner-name {
     font-family: 'Work Sans', sans-serif;
-    font-size: clamp(16px, 3.5vw, 44px);
+    font-size: clamp(24px, 3.5vw, 44px);
     font-weight: 700;
     color: #ffffff;
     margin: 0;
@@ -468,159 +536,80 @@ onUnmounted(() => {
     line-height: 1.15;
 }
 
-.congrats-container.animate-in .winner-name {
-    animation: slideUpFade 0.5s ease-out 0.3s both;
-}
-
 .winner-phone {
     font-family: 'Work Sans', sans-serif;
-    font-size: clamp(18px, 2.5vw, 44px);
+    font-size: clamp(16px, 2.5vw, 28px);
     font-weight: 600;
-    color: #ffffff;
-    opacity: 0.95;
+    color: #e1750a;
     margin: 0;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
-    letter-spacing: 2px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    line-height: 1.15;
 }
 
-.congrats-container.animate-in .winner-phone {
-    animation: slideUpFade 0.5s ease-out 0.4s both;
+/* ─── Inlined WinnerCard Styles ────────────────────────────── */
+.winner-card {
+    width: var(--card-width);
+    height: var(--card-height);
+    padding: 14px;
+    border-radius: 22px;
+    background: linear-gradient(180deg, #f8d64e 0%, #f5c62b 40%, #ef9600 100%);
+    box-sizing: border-box;
 }
 
-@keyframes slideUpFade {
-    from {
-        opacity: 0;
-        transform: translateY(30px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.winner-card-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 16px;
+    border: 3px solid rgba(255, 255, 255, 0.4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
-/* ==================== RESPONSIVE STYLES ==================== */
-
-/* Large TV screens */
-@media (min-width: 1920px) {
-    .congrats-container {
-        gap: clamp(20px, 2.5vh, 36px);
-    }
-
-    .congrats-img {
-        height: clamp(160px, 18vh, 300px);
-    }
-
-    .winner-profile {
-        width: clamp(180px, 18vh, 300px);
-        height: clamp(180px, 18vh, 300px);
-        border-radius: 28px;
-        border-width: 5px;
-    }
-
-    .winner-name {
-        font-size: clamp(40px, 3.5vw, 80px);
-    }
-
-    .winner-phone {
-        font-size: clamp(28px, 2.5vw, 56px);
-    }
-
-    .firework-lottie {
-        width: 600px;
-        height: 600px;
-    }
+.winner-badge {
+    width: calc(100% + 32px);
+    margin-top: 14px;
+    margin-bottom: 16px;
 }
 
-/* 4K-screens */
-@media (min-width: 2560px) {
-    .congrats-container {
-        gap: clamp(24px, 2.5vh, 44px);
-    }
-
-    .congrats-img {
-        height: clamp(200px, 20vh, 380px);
-    }
-
-    .winner-profile {
-        width: clamp(220px, 20vh, 360px);
-        height: clamp(220px, 20vh, 360px);
-        border-radius: 32px;
-        border-width: 6px;
-    }
-
-    .winner-name {
-        font-size: clamp(52px, 3.5vw, 100px);
-    }
-
-    .winner-phone {
-        font-size: clamp(36px, 2.5vw, 72px);
-    }
-
-    .firework-lottie {
-        width: 800px;
-        height: 800px;
-    }
+.winner-badge img {
+    width: 100%;
+    display: block;
 }
 
-/* Tablets */
-@media (max-width: 1024px) {
-    .congrats-container {
-        gap: clamp(12px, 2vh, 24px);
-    }
-
-    .congrats-img {
-        height: clamp(90px, 14vh, 170px);
-    }
-
-    .winner-profile {
-        width: clamp(130px, 16vh, 200px);
-        height: clamp(130px, 16vh, 200px);
-    }
-
-    .firework-lottie {
-        width: 300px;
-        height: 300px;
-    }
-
-    .firework-lottie-2 {
-        width: 250px;
-        height: 250px;
-    }
+.winner-photo {
+    width: 120px;
+    height: 120px;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 3px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    margin-bottom: 16px;
 }
 
-/* Mobile phones */
-@media (max-width: 768px) {
-    .congrats-container {
-        gap: clamp(10px, 1.8vh, 18px);
-    }
+.winner-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
 
-    .congrats-img {
-        height: clamp(70px, 12vh, 130px);
-    }
+.winner-name-card {
+    font-weight: 700;
+    font-size: 33.79px;
+    line-height: 100%;
+    text-align: center;
+    font-family: 'Work Sans', sans-serif;
+    color: rgba(41, 43, 58, 1);
+}
 
-    .winner-profile {
-        width: clamp(110px, 18vh, 160px);
-        height: clamp(110px, 18vh, 160px);
-        border-radius: 16px;
-        border-width: 3px;
-    }
-
-    .winner-name {
-        font-size: clamp(20px, 6vw, 36px);
-    }
-
-    .winner-phone {
-        font-size: clamp(14px, 4.5vw, 24px);
-    }
-
-    .firework-lottie {
-        width: 150px;
-        height: 250px;
-    }
-
-    .firework-lottie-2 {
-        display: none;
-    }
+.winner-phone-card {
+    margin-top: 8px;
+    font-family: 'Work Sans', sans-serif;
+    font-size: 24px;
+    font-weight: 500;
+    color: rgba(41, 43, 58, 1);
 }
 </style>
