@@ -322,10 +322,10 @@ const showWinner = () => {
   width: 100%;
   height: 100%;
   max-width: 100%;
-  border-radius: 24px;
+  border-radius: 8px;
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
-  border: 4px solid #ffffff;
-  object-fit: cover;
+  border: 2px solid #ffffff;
+
   animation: errorFadeIn 0.6s ease-out;
 }
 
