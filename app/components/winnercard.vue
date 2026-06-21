@@ -205,16 +205,24 @@ onMounted(() => {
 
 .winner-name {
     font-weight: 700;
-    font-size: calc(var(--card-width) * 0.11);
-    line-height: 100%;
+    /* Responsive font size: smaller for long names */
+    font-size: clamp(calc(var(--card-width) * 0.08), calc(var(--card-width) * 0.10), calc(var(--card-width) * 0.12));
+    line-height: 1.1;
     text-align: center;
     font-family: 'Work Sans', sans-serif;
-
+    /* small gap from profile icon */
+    margin-top: calc(var(--card-width) * 0.02);
+    /* Allow wrapping for multi-word names */
+    overflow: hidden;
+    /* Enable word breaking */
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
     color: rgba(41, 43, 58, 1);
 }
 
 .winner-phone {
-    margin-top: calc(var(--card-width) * 0.026);
+    margin-top: calc(var(--card-width) * 0.01);
 
     font-family: 'Work Sans', sans-serif;
     font-size: calc(var(--card-width) * 0.08);
