@@ -43,7 +43,8 @@
             <img src="/bl.png" />
             <img src="/mid.png" />
             <img src="/br.png" />
-            <div class="footer-text">🏆 THANK YOU FOR PARTICIPATING! 🏆</div>
+            <div class="footer-text"><span class="trophy">🏆</span> THANK YOU FOR PARTICIPATING! <span
+                    class="trophy">🏆</span></div>
         </div>
     </section>
 </template>
@@ -524,6 +525,33 @@ onUnmounted(() => {
     white-space: nowrap;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
     pointer-events: none;
+}
+
+.trophy {
+    display: inline-block;
+    animation: trophyPulse 2s ease-in-out infinite;
+}
+
+.trophy:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.trophy:nth-child(2) {
+    animation-delay: 1s;
+}
+
+@keyframes trophyPulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.6);
+        opacity: 1;
+    }
 }
 
 /* ─── Responsive fine‑tuning ────────────────────────────────── */
