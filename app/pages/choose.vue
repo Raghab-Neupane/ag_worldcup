@@ -68,7 +68,7 @@ const showWinner = () => {
   isExiting.value = true
   setTimeout(() => {
     goToWinner()
-  }, 800)
+  }, 700)
 }
 </script>
 
@@ -104,7 +104,6 @@ const showWinner = () => {
 }
 
 .choose-page.exiting .vs-container {
-  transform: scale(0) rotate(180deg);
   opacity: 0;
 }
 
@@ -115,7 +114,6 @@ const showWinner = () => {
 }
 
 .choose-page.exiting .button-wrapper {
-  transform: translateY(100px) scale(0.8);
   opacity: 0;
 }
 
