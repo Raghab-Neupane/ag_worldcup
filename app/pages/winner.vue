@@ -4,36 +4,33 @@
 
         <div class="card-stage">
             <div class="stage-container" :style="cardSizeVars" :class="{ 'fade-out': fadeReelCards }">
-                <img src="/Stage.png" class="stage-image" />
-                <img src="/Crops.png" class="crop-image" />
+                <img src="/stage.png" class="stage-image" />
+                <img src="/crops.png" class="crop-image" />
             </div>
 
-            <!--
-        INFINITE SCROLL FIX:
-        - Iterate over `visibleCards` (7 cards from the large buffer)
-        - Each card has a unique `id` as key → Vue creates fresh elements
-        - `index` is the relative position (0..6) used for styling
-      -->
             <div v-for="(cardId, index) in visibleCards" :key="cardId" class="card-wrapper" :class="{
                 'fade-left': fadeReelCards && index < 3,
                 'fade-right': fadeReelCards && index > 3,
-                'fade-center': fadeReelCards && index === 3
+                'hide-center': showWinnerReveal && index === 3
             }" :style="[getCardStyle(index), cardSizeVars]">
                 <Card />
             </div>
 
-            <WinnerReveal v-if="showWinnerReveal" :card-size-vars="cardSizeVars" :fade-duration="FADE_DURATION"
+            <WinnerReveal v-if="showWinnerReveal" ref="winnerRevealEl" :card-size-vars="cardSizeVars"
                 :winner-name="winnerName" :winner-phone="winnerPhone" :winner-image="winnerImage"
-                :class="{ 'on-congrats-stage': cardOnStage }" />
+                @flipped="onFlipped" />
         </div>
 
-        <!-- Congratulations overlay -->
-        <CongratulationsPage v-if="showCongratulations" :is-overlay="true" />
+        <!-- Mounted as soon as the flip ends so we can measure its real
+             dock-anchor box, but stays invisible (`:visible`) until the
+             hold finishes. -->
+        <CongratulationsPage v-if="showCongratulations" ref="congratsEl" :is-overlay="true" :visible="congratsRevealed"
+            :winner="congratsWinnerPayload" />
     </section>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import type { CSSProperties } from 'vue'
 
 import Background from '../components/background.vue'
@@ -41,32 +38,39 @@ import Card from '../components/card.vue'
 import WinnerReveal from '../components/WinnerReveal.vue'
 import CongratulationsPage from './congratulations.vue'
 
-const ASPECT_RATIO = 485.79 / 337.94
-const MIN_CARD_WIDTH = 230
-const MAX_CARD_WIDTH = 300
-const SPACING_FACTOR = 0.75
+// Single shared aspect ratio for the reel cards AND the reveal/dock card —
+// both now stay visually consistent throughout the whole sequence
+// (spin → flip → dock), matching the look in congratulations.vue.
+const ASPECT_RATIO = 258 / 180
 
-// ─────────────────────────────────────────────
-// SCROLL CONFIG (unchanged)
-// ─────────────────────────────────────────────
+const MIN_CARD_WIDTH = 130
+const MAX_CARD_WIDTH = 640
+const SPACING_FACTOR = 0.82
+
 const START_DELAY = 1200
 const SPIN_DURATION = 7000
 const START_SPEED = 100
 const MID_SPEED = 200
 const END_SPEED = 500
 const MIDPOINT = 0.7
-
 const REVEAL_DELAY = 200
-const FADE_DELAY = 200
-const FADE_DURATION = 990
-const REDIRECT_DELAY = 2500
-// ─────────────────────────────────────────────
+
+// How long to hold the flipped card before it glides onto the podium.
+// The size-morph (see onFlipped) starts immediately and uses this same
+// window to finish settling into shape.
+const DOCK_DELAY = 1200
 
 const cardWidth = ref(230)
 const showWinnerReveal = ref(false)
 const fadeReelCards = ref(false)
 const showCongratulations = ref(false)
-const cardOnStage = ref(false)
+// Separate from showCongratulations: this mounts the stage EARLY
+// (invisible) purely so we can measure it; this flips true only once
+// the hold ends, fading in confetti/title/stage for real.
+const congratsRevealed = ref(false)
+
+const winnerRevealEl = ref<InstanceType<typeof WinnerReveal> | null>(null)
+const congratsEl = ref<InstanceType<typeof CongratulationsPage> | null>(null)
 
 let startTimeout: ReturnType<typeof setTimeout> | null = null
 let scrollTimeout: ReturnType<typeof setTimeout> | null = null
@@ -77,54 +81,42 @@ const cardSizeVars = computed(() => ({
     '--card-height': `${cardHeight.value}px`
 }))
 
-// ─── INFINITE SCROLL BUFFER ──────────────────
-// Buffer holds all cards; we slide a window of 7 over it.
-const BUFFER_SIZE = 50                      // plenty for the whole spin
-const fullCards = ref<number[]>([])         // unique IDs
-const offset = ref(0)                       // current window start
+// ─── INFINITE SCROLL BUFFER (LEFT → RIGHT) ──
+const BUFFER_SIZE = 50
+const fullCards = ref<number[]>([])
+const offset = ref(0)
 
-// Visible cards = 7 cards starting at offset
 const visibleCards = computed(() => {
     return fullCards.value.slice(offset.value, offset.value + 7)
 })
 
-// Fill buffer on mount
 function initBuffer() {
     const ids: number[] = []
     for (let i = 0; i < BUFFER_SIZE; i++) {
         ids.push(i)
     }
     fullCards.value = ids
-    offset.value = 0
+    offset.value = BUFFER_SIZE - 7
 }
 
-// Add new cards when we near the end of the buffer
-function ensureBufferHasCards() {
-    const needed = offset.value + 7
-    if (needed >= fullCards.value.length) {
-        const lastId = fullCards.value[fullCards.value.length - 1] ?? 0
-        for (let i = 1; i <= 10; i++) {
-            fullCards.value.push(lastId + i)
-        }
+function ensureBufferHasCardsBefore() {
+    if (offset.value >= 0) return
+    const firstId = fullCards.value[0] ?? 0
+    const count = 10
+    for (let i = count; i >= 1; i--) {
+        fullCards.value.unshift(firstId - i)
     }
+    offset.value += count
 }
 // ─────────────────────────────────────────────
 
-// ─── Winner data (unchanged) ────────────────
 const config = useRuntimeConfig()
 const winnerData = ref<any>(null)
 
 const winnerName = computed(() => winnerData.value?.name || 'No correct guess.')
-const winnerPhone = computed(() => {
-    const rawPhone = winnerData.value?.mobile_number || ''
-    if (!rawPhone) return ''
-    const p = rawPhone.trim()
-    if (p.length <= 4) return p
-    return p.slice(0, 2) + '*'.repeat(p.length - 4) + p.slice(-2)
-})
-
+const winnerPhone = computed(() => winnerData.value?.mobile_number || winnerData.value?.phone || '')
 const winnerImage = computed(() => {
-    const photo = winnerData.value?.photo
+    const photo = winnerData.value?.photo || winnerData.value?.image
     if (photo && photo !== 'dummy' && photo !== 'photo' && photo !== 'null' && photo !== 'undefined') {
         if (photo.startsWith('http://') || photo.startsWith('https://') || photo.startsWith('/')) {
             return photo
@@ -132,13 +124,21 @@ const winnerImage = computed(() => {
         const base = config?.public?.assetsUrl || ''
         return base ? (base.endsWith('/') ? base + photo : base + '/' + photo) : photo
     }
-    return '/profile.webp'
+    return ''
 })
 
-// ─── Card styling (now uses relative index 0..6) ─────────────
+const congratsWinnerPayload = computed(() => {
+    if (!winnerData.value) return null
+    return {
+        name: winnerName.value,
+        photo: winnerData.value?.photo || winnerData.value?.image || '',
+        mobile_number: winnerData.value?.mobile_number || winnerData.value?.phone || ''
+    }
+})
+
 const getCardStyle = (relativeIndex: number): CSSProperties => {
     const spacing = cardWidth.value * SPACING_FACTOR
-    const x = (relativeIndex - 3) * spacing          // center = index 3
+    const x = (relativeIndex - 3) * spacing
     const scales = [0.72, 0.90, 1.00, 1.15, 1.00, 0.90, 0.72]
     const zIndices = [1, 2, 3, 10, 3, 2, 1]
 
@@ -146,12 +146,14 @@ const getCardStyle = (relativeIndex: number): CSSProperties => {
         position: 'absolute',
         left: '50%',
         bottom: '0',
-        transform: `translateX(calc(-50% + ${x}px)) scale(${scales[relativeIndex]})`,
-        zIndex: zIndices[relativeIndex]
+        transform:
+            `translate3d(${x}px,0,0) scale(${scales[relativeIndex]})`,
+        marginLeft: `-${cardWidth.value / 2}px`,
+        zIndex: zIndices[relativeIndex],
+        willChange: 'transform'
     }
 }
 
-// ─── Easing and speed (unchanged) ──────────
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
 
 const getDelay = (progress: number) => {
@@ -163,7 +165,6 @@ const getDelay = (progress: number) => {
     return MID_SPEED + (END_SPEED - MID_SPEED) * easeOutCubic(local)
 }
 
-// ─── Animation loop ────────────────────────
 const startScrollAnimation = () => {
     const startTime = performance.now()
 
@@ -171,21 +172,15 @@ const startScrollAnimation = () => {
         const elapsed = performance.now() - startTime
 
         if (elapsed >= SPIN_DURATION) {
-            // Reel stopped – trigger reveal & fade
+            fadeReelCards.value = true
             setTimeout(() => {
                 showWinnerReveal.value = true
-                fadeReelCards.value = true
             }, REVEAL_DELAY)
-            setTimeout(() => { showCongratulations.value = true }, REVEAL_DELAY + REDIRECT_DELAY)
-            setTimeout(() => { cardOnStage.value = true }, REVEAL_DELAY + REDIRECT_DELAY + 700)
             return
         }
 
-        // ─── INFINITE SCROLL STEP ────────────────────────
-        // Slide the window forward by 1 card
-        offset.value += 1
-        ensureBufferHasCards()   // add more if needed
-        // ────────────────────────────────────────────────
+        offset.value -= 1
+        ensureBufferHasCardsBefore()
 
         const progress = elapsed / SPIN_DURATION
         const delay = getDelay(progress)
@@ -196,23 +191,77 @@ const startScrollAnimation = () => {
     animate()
 }
 
-// ─── Responsive card width (unchanged) ──────
+// ─── Flip finished → measure stage early, morph size, hold, then dock ──
+const hasDocked = ref(false)
+
+const onFlipped = async () => {
+    await winnerRevealEl.value?.lockInPlace()
+
+    // Mount the congrats stage now — but it stays invisible (`visible`
+    // prop false) until the hold ends. This lets us measure its REAL
+    // dock-anchor box right away and morph the card toward that EXACT
+    // size during the hold. No analytic approximation, no guessing —
+    // whatever size the anchor actually renders at is what we morph to.
+    showCongratulations.value = true
+    await nextTick()
+    await congratsEl.value?.waitForStageReady?.()
+
+    const earlyRect = congratsEl.value?.getCardDockRect?.()
+    if (earlyRect) {
+        winnerRevealEl.value?.morphToSize(earlyRect.width, earlyRect.height)
+    }
+
+    setTimeout(async () => {
+        congratsRevealed.value = true // fades in confetti/title/stage
+        await nextTick()
+        applyDock()
+        hasDocked.value = true
+    }, DOCK_DELAY)
+}
+
+// Re-measures the anchor RIGHT NOW and moves+resizes the card to match
+// exactly. Called once at dock time, then again on every resize/orientation
+// change while docked.
+const applyDock = () => {
+    const dockRect = congratsEl.value?.getCardDockRect?.()
+    if (!dockRect) return
+    winnerRevealEl.value?.morphToSize(dockRect.width, dockRect.height)
+    winnerRevealEl.value?.dockToStage({ top: dockRect.top, left: dockRect.left, scale: 1 })
+}
+
+let resyncRaf: number | null = null
+const handleViewportChange = () => {
+    updateCardWidth()
+    if (!hasDocked.value) return
+    if (resyncRaf) cancelAnimationFrame(resyncRaf)
+    resyncRaf = requestAnimationFrame(() => {
+        requestAnimationFrame(() => applyDock())
+    })
+}
+
 const updateCardWidth = () => {
-    const target = window.innerWidth / 5.5
+    const widthTarget = window.innerWidth / 6.3
+    const heightTarget = window.innerHeight / 1.75
+    const target = Math.min(widthTarget, heightTarget)
     cardWidth.value = Math.min(MAX_CARD_WIDTH, Math.max(MIN_CARD_WIDTH, target))
 }
 
-// ─── Lifecycle ──────────────────────────────
+let dockResizeObserver: ResizeObserver | null = null
+
 onMounted(async () => {
     updateCardWidth()
-    window.addEventListener('resize', updateCardWidth)
+    window.addEventListener('resize', handleViewportChange)
+    window.addEventListener('orientationchange', handleViewportChange)
 
-    // Initialise the infinite card buffer
+    if (typeof ResizeObserver !== 'undefined') {
+        dockResizeObserver = new ResizeObserver(() => handleViewportChange())
+        dockResizeObserver.observe(document.documentElement)
+    }
+
     initBuffer()
 
     startTimeout = setTimeout(() => startScrollAnimation(), START_DELAY)
 
-    // Fetch winner data (unchanged)
     const postId = sessionStorage.getItem('selectedPostId')
     if (postId) {
         try {
@@ -231,18 +280,21 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-    window.removeEventListener('resize', updateCardWidth)
+    window.removeEventListener('resize', handleViewportChange)
+    window.removeEventListener('orientationchange', handleViewportChange)
+    dockResizeObserver?.disconnect()
+    if (resyncRaf) cancelAnimationFrame(resyncRaf)
     if (startTimeout) clearTimeout(startTimeout)
     if (scrollTimeout) clearTimeout(scrollTimeout)
 })
 </script>
 
 <style scoped>
-/* ─── ALL STYLES REMAIN EXACTLY AS BEFORE ─── */
 .winner-page {
-    position: relative;
+    position: fixed;
+    inset: 0;
     width: 100%;
-    height: 100vh;
+    height: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -252,8 +304,8 @@ onUnmounted(() => {
 .card-stage {
     position: relative;
     width: 100%;
-    height: 500px;
-    margin-top: 80px;
+    height: clamp(280px, 58vh, 1100px);
+    margin-top: clamp(32px, 8vh, 160px);
 }
 
 .card-wrapper {
@@ -262,9 +314,15 @@ onUnmounted(() => {
     height: var(--card-height);
     transform-origin: center center;
     transition:
-        transform v-bind('FADE_DURATION + "ms"') cubic-bezier(0.22, 1, 0.36, 1),
-        left v-bind('FADE_DURATION + "ms"') cubic-bezier(0.22, 1, 0.36, 1),
-        opacity v-bind('FADE_DURATION + "ms"') ease;
+        transform 150ms ease-out,
+        opacity 300ms ease;
+    will-change: transform;
+}
+
+.card-wrapper>* {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
 }
 
 .fade-left {
@@ -277,21 +335,30 @@ onUnmounted(() => {
     transform: translateX(1200px) scale(0.4) !important;
 }
 
-.fade-center {
+.hide-center {
     opacity: 0;
+    transition: none;
 }
 
+/* Mini stage/platform behind the spinning cards. Sizing now mirrors
+   congratulations.vue's .stage-wrapper exactly (1.5x card width,
+   1.45x card height) and the image rules below mirror its
+   .stage-image / .crop-image, so the platform reads at the same scale
+   during the spin as it does once the card is docked — no visual jump
+   in the background stage itself when the page swaps over. */
 .stage-container {
     position: absolute;
     left: 50%;
     bottom: -60px;
-    width: var(--card-width);
-    transform: translateX(-50%) scale(1.15);
+    width: calc(var(--card-width) * 1.5);
+    height: calc(var(--card-height, 300px) * 1.45);
+    max-width: 1100px;
+    transform: translateX(-50%);
     z-index: 0;
     display: flex;
     justify-content: center;
     align-items: flex-end;
-    transition: opacity v-bind('FADE_DURATION + "ms"') ease;
+    transition: opacity 990ms ease;
 }
 
 .stage-container.fade-out {
@@ -302,9 +369,8 @@ onUnmounted(() => {
 .stage-image {
     position: relative;
     z-index: 1;
-    width: 200%;
-    max-width: 380px;
-    flex-shrink: 0;
+    width: 100%;
+    max-width: 900px;
     height: auto;
     display: block;
     filter: drop-shadow(0 6px 15px rgba(0, 0, 0, 0.45));
@@ -312,15 +378,14 @@ onUnmounted(() => {
 
 .crop-image {
     position: absolute;
-    z-index: 0;
+    z-index: 2;
     left: 50%;
-    bottom: 30%;
-    width: 240%;
-    max-width: 440px;
-    flex-shrink: 0;
+    bottom: 10%;
+    width: 130%;
+    max-width: 1100px;
     height: auto;
     transform: translateX(-50%);
-    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.35));
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.15));
 }
 
 @media (max-width: 768px) {
@@ -336,14 +401,5 @@ onUnmounted(() => {
     .crop-image {
         max-width: 320px;
     }
-}
-
-/* WinnerReveal overlay positioning (unchanged) */
-:deep(.reveal-container.on-congrats-stage) {
-    position: fixed !important;
-    left: 50% !important;
-    bottom: calc(clamp(100px, 12vh, 160px) + 20px) !important;
-    transform: translateX(-50%) scale(0.9) !important;
-    z-index: 22 !important;
 }
 </style>

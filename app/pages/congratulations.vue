@@ -1,5 +1,5 @@
 <template>
-    <section class="congratulations-page" :class="{ 'overlay-mode': isOverlay }">
+    <section class="congratulations-page" :class="{ 'overlay-mode': isOverlay, 'pre-reveal': isOverlay && !visible }">
         <Background v-if="!isOverlay" />
 
         <!-- Lottie Animations Container -->
@@ -17,9 +17,14 @@
             </div>
 
             <!-- Winner card, standing on the stage, framed by the gold wreath -->
-            <div class="stage-wrapper" v-if="hasWinner" :style="stageStyle">
-                <img src="/stage.png" alt="Stage" class="stage-image" />
-                <img src="/crops.png" alt="Crop" class="crop-image" />
+            <!-- NOTE: the actual winner card is NOT rendered here — it's the
+                 same WinnerReveal card from winner.vue, smoothly docked into
+                 this exact slot (see card-dock-anchor) so there's no swap/cut. -->
+            <div class="stage-wrapper" v-if="hasWinner" ref="stageWrapperEl" :style="stageStyle">
+                <img src="/stage.png" alt="Stage" class="stage-image" @load="onStageImgLoad" />
+                <img src="/crops.png" alt="Crop" class="crop-image" @load="onStageImgLoad" />
+                <!-- Invisible anchor marking exactly where the card should sit on the stage -->
+                <div ref="cardDockAnchor" class="card-dock-anchor"></div>
             </div>
 
             <!-- Draw/Oops Fallback Case -->
@@ -44,14 +49,31 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, onUnmounted, watch } from 'vue'
+import { computed, onMounted, ref, onUnmounted, watch, nextTick } from 'vue'
 import lottie from 'lottie-web'
 import Background from '../components/background.vue'
 
 const props = withDefaults(defineProps<{
     isOverlay?: boolean
+    // When true (default), the page renders normally. When used as the
+    // winner.vue overlay, this starts false — the stage is mounted and
+    // measurable (images loaded, anchor laid out) but invisible, so the
+    // card can morph to the real dock size before anything is shown.
+    // Parent flips this true once the hold ends, fading everything in.
+    visible?: boolean
+    // When provided (winner already known from the reel/flip step), skip
+    // the page's own fetch and just use this — avoids double-fetching and
+    // any chance the overlay shows a different winner than the card that's
+    // mid-flight onto the stage.
+    winner?: {
+        name: string
+        photo?: string
+        mobile_number?: string
+    } | null
 }>(), {
-    isOverlay: false
+    isOverlay: false,
+    visible: true,
+    winner: undefined
 })
 
 interface Winner {
@@ -71,11 +93,13 @@ const intervals: number[] = []
 const confettiLottie = ref<HTMLDivElement | null>(null)
 const fireworkLottie = ref<HTMLDivElement | null>(null)
 const fireworkLottie2 = ref<HTMLDivElement | null>(null)
+const stageWrapperEl = ref<HTMLDivElement | null>(null)
+const cardDockAnchor = ref<HTMLDivElement | null>(null)
 
 // ─── Responsive card size (same as winner page) ──────────────
 const ASPECT_RATIO = 485.79 / 337.94
-const MIN_CARD_WIDTH = 180
-const MAX_CARD_WIDTH = 300
+const MIN_CARD_WIDTH = 110
+const MAX_CARD_WIDTH = 520
 
 const cardWidth = ref(220)
 const cardHeight = computed(() => cardWidth.value * ASPECT_RATIO)
@@ -85,37 +109,54 @@ const cardSizeVars = computed(() => ({
     '--card-height': `${cardHeight.value}px`
 }))
 
-// Stage wrapper style: scales with card width, keeping proportions
+// Stage wrapper style: scales with card width, keeping proportions.
+// No hard maxWidth cap — on an 8K TV the stage should genuinely get big,
+// not stall out at a tiny fixed pixel ceiling meant for laptop screens.
+//
+// NOTE: height multiplier bumped 1.25 -> 1.35 to give the now-larger
+// card-dock-anchor enough vertical headroom so the bigger card doesn't
+// get visually cropped against the top of this wrapper.
 const stageStyle = computed(() => ({
     width: `${cardWidth.value * 1.5}px`,   // stage wider than card
-    height: `${cardHeight.value * 1.25}px`, // enough space for card + stage elements
-    maxWidth: '460px',
+    height: `${cardHeight.value * 1.35}px`, // enough space for card + stage elements
     margin: '0 auto'
 }))
 
+// Same width+height-based sizing as winner.vue, so a short laptop screen
+// doesn't get cards sized only off its width, and a big TV can scale up.
 const updateCardWidth = () => {
-    const target = window.innerWidth / 6.5
+    const widthTarget = window.innerWidth / 6.5
+    const heightTarget = window.innerHeight / 2.2
+    const target = Math.min(widthTarget, heightTarget)
     cardWidth.value = Math.min(MAX_CARD_WIDTH, Math.max(MIN_CARD_WIDTH, target))
 }
 
 // ─── Winner data ───────────────────────────────────────────────
 const config = useRuntimeConfig()
-const postId = sessionStorage.getItem('selectedPostId')
-const { data: winnerDataFromApi } = await useFetch<Winner>(
-    `${config.public.winnersEndpoint}?post_id=${postId}`
-)
 
 const winnerData = ref<Winner | null>(null)
 
-watch(winnerDataFromApi, (newVal) => {
-    if (newVal) {
-        if (typeof newVal === 'object' && 'winner' in newVal && (newVal as any).winner === null) {
-            winnerData.value = null
-        } else {
-            winnerData.value = typeof newVal === 'object' ? ((newVal as any).winner || newVal) : null
+if (props.winner !== undefined) {
+    // Winner handed down from winner.vue — already resolved, no fetch needed.
+    watch(() => props.winner, (val) => {
+        winnerData.value = val ? (val as Winner) : null
+    }, { immediate: true })
+} else {
+    const postId = sessionStorage.getItem('selectedPostId')
+    const { data: winnerDataFromApi } = await useFetch<Winner>(
+        `${config.public.winnersEndpoint}?post_id=${postId}`
+    )
+
+    watch(winnerDataFromApi, (newVal) => {
+        if (newVal) {
+            if (typeof newVal === 'object' && 'winner' in newVal && (newVal as any).winner === null) {
+                winnerData.value = null
+            } else {
+                winnerData.value = typeof newVal === 'object' ? ((newVal as any).winner || newVal) : null
+            }
         }
-    }
-}, { immediate: true })
+    }, { immediate: true })
+}
 
 const hasWinner = computed(() => {
     if (!winnerData.value) return false
@@ -148,6 +189,16 @@ const handleImageError = (event: Event) => {
     (event.target as HTMLImageElement).src = '/profile.svg'
 }
 
+// ─── Trigger the entrance fade-in ─────────────────────────────
+// Gated on `visible` instead of firing unconditionally on mount: when
+// used as the winner.vue overlay, the component mounts early (invisible)
+// purely so its stage can be measured — this only plays once the parent
+// actually reveals it. For non-overlay usage `visible` defaults true, so
+// this fires immediately exactly like before.
+watch(() => props.visible, (v) => {
+    if (v) setTimeout(() => { animateIn.value = true }, 100)
+}, { immediate: true })
+
 // ─── Load Lottie animations ──────────────────────────────────
 const loadAnimation = (fileName: string) => {
     return new Promise((resolve, reject) => {
@@ -161,25 +212,53 @@ const loadAnimation = (fileName: string) => {
     })
 }
 
+// ─── Exposed: where should the WinnerReveal card land on the stage? ──
+const stageImagesLoadedCount = ref(0)
+const onStageImgLoad = () => {
+    stageImagesLoadedCount.value += 1
+}
+
+// Resolves once both stage images have fired @load AND a couple of
+// animation frames have passed (so layout/paint has actually settled).
+// Reading getBoundingClientRect before this is what was causing the
+// card to land at the wrong spot/size — the stage hadn't finished
+// loading its images yet, so its box was still 0/garbage.
+const waitForStageReady = () => {
+    return new Promise<void>((resolve) => {
+        const check = () => {
+            if (stageImagesLoadedCount.value >= 2) {
+                requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+            } else {
+                setTimeout(check, 30)
+            }
+        }
+        check()
+    })
+}
+
+// Returns the dock anchor's REAL on-screen box — center point (for
+// positioning) and actual pixel width/height (for sizing). No relative
+// scale math: the caller morphs the card directly to width/height, so
+// there's no approximation to drift out of sync with what's really
+// rendered.
+const getCardDockRect = () => {
+    if (!cardDockAnchor.value) return null
+    const rect = cardDockAnchor.value.getBoundingClientRect()
+    return {
+        top: `${rect.top + rect.height / 2}px`,
+        left: `${rect.left + rect.width / 2}px`,
+        width: rect.width,
+        height: rect.height
+    }
+}
+
+defineExpose({ getCardDockRect, waitForStageReady })
+
 onMounted(async () => {
     updateCardWidth()
     window.addEventListener('resize', updateCardWidth)
 
-    // Load winner from sessionStorage fallback only if API didn't return one
-    if (!winnerData.value) {
-        const storedWinner = sessionStorage.getItem('winner')
-        if (storedWinner) {
-            const parsed = JSON.parse(storedWinner)
-            if (parsed && typeof parsed === 'object' && 'winner' in parsed && parsed.winner === null) {
-                winnerData.value = null
-            } else {
-                winnerData.value = parsed && typeof parsed === 'object' ? (parsed.winner || parsed) : null
-            }
-        }
-    }
-
-    // Trigger entrance animation
-    setTimeout(() => { animateIn.value = true }, 100)
+    await nextTick()
 
     try {
         if (hasWinner.value) {
@@ -252,6 +331,15 @@ onUnmounted(() => {
     height: 100%;
     background: transparent;
     z-index: 15;
+    transition: opacity 0.5s ease;
+}
+
+/* Mounted-but-not-revealed state: stays in the layout (so images load
+   and the dock anchor is measurable) but is fully invisible and inert
+   until the parent flips `visible` to true. */
+.congratulations-page.overlay-mode.pre-reveal {
+    opacity: 0;
+    pointer-events: none;
 }
 
 /* ─── Lottie animations ─────────────────────────────────────── */
@@ -346,8 +434,8 @@ onUnmounted(() => {
     justify-content: center;
     align-items: flex-end;
     width: 100%;
-    max-width: 460px;
-    height: calc(var(--card-height, 300px) * 1.25);
+    max-width: 1100px;
+    height: calc(var(--card-height, 300px) * 1.45);
     margin: 0 auto;
 }
 
@@ -355,7 +443,7 @@ onUnmounted(() => {
     position: relative;
     z-index: 1;
     width: 100%;
-    max-width: 380px;
+    max-width: 900px;
     height: auto;
     display: block;
     filter: drop-shadow(0 6px 15px rgba(0, 0, 0, 0.45));
@@ -367,21 +455,29 @@ onUnmounted(() => {
     left: 50%;
     bottom: 10%;
     width: 130%;
-    max-width: 480px;
+    max-width: 1100px;
     height: auto;
     transform: translateX(-50%);
     filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.15));
 }
 
-.winner-card-el {
+/* Invisible marker — purely a geometry anchor read via getBoundingClientRect
+   so winner.vue knows exactly where to dock the incoming card. Sits where
+   the card should visually rest on the stage.
+   width/bottom bumped up from 48%/14% so the docked card grows tall
+   enough that its top edge reaches the white line/wreath crossover —
+   aspect-ratio is locked to the card's native shape, so height scales
+   automatically with width. Nudge these two values to fine-tune. */
+.card-dock-anchor {
     position: absolute;
     z-index: 3;
     left: 50%;
-    bottom: 8%;
-    width: var(--card-width);
-    height: var(--card-height);
+    bottom: 10%;
+    width: 65%;
+    aspect-ratio: 337.94 / 485.79;
     transform: translateX(-50%);
-    filter: drop-shadow(0 10px 18px rgba(225, 117, 10, 0.5));
+    pointer-events: none;
+    visibility: hidden;
 }
 
 /* ─── Footer ─────────────────────────────────────────────────── */
@@ -452,10 +548,6 @@ onUnmounted(() => {
     .crop-image {
         max-width: 300px;
         bottom: 6%;
-    }
-
-    .winner-card-el {
-        bottom: 4%;
     }
 
     .firework-lottie {
@@ -544,72 +636,5 @@ onUnmounted(() => {
     margin: 0;
     text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
     line-height: 1.15;
-}
-
-/* ─── Inlined WinnerCard Styles ────────────────────────────── */
-.winner-card {
-    width: var(--card-width);
-    height: var(--card-height);
-    padding: 14px;
-    border-radius: 22px;
-    background: linear-gradient(180deg, #f8d64e 0%, #f5c62b 40%, #ef9600 100%);
-    box-sizing: border-box;
-}
-
-.winner-card-inner {
-    width: 100%;
-    height: 100%;
-    border-radius: 16px;
-    border: 3px solid rgba(255, 255, 255, 0.4);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 24px 16px;
-    box-sizing: border-box;
-    overflow: hidden;
-}
-
-.winner-badge {
-    width: calc(100% + 32px);
-    margin-top: 14px;
-    margin-bottom: 16px;
-}
-
-.winner-badge img {
-    width: 100%;
-    display: block;
-}
-
-.winner-photo {
-    width: 120px;
-    height: 120px;
-    overflow: hidden;
-    border-radius: 12px;
-    border: 3px solid rgba(255, 255, 255, 0.6);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-    margin-bottom: 16px;
-}
-
-.winner-photo img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.winner-name-card {
-    font-weight: 700;
-    font-size: 33.79px;
-    line-height: 100%;
-    text-align: center;
-    font-family: 'Work Sans', sans-serif;
-    color: rgba(41, 43, 58, 1);
-}
-
-.winner-phone-card {
-    margin-top: 8px;
-    font-family: 'Work Sans', sans-serif;
-    font-size: 24px;
-    font-weight: 500;
-    color: rgba(41, 43, 58, 1);
 }
 </style>

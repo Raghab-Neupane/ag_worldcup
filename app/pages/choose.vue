@@ -111,7 +111,7 @@ const showWinner = () => {
 }
 
 .choose-page.exiting .group-title {
-  transform: translateY(-100px);
+  transform: translateY(100px);
   letter-spacing: -0.5px;
   opacity: 0;
 }

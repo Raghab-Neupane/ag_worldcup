@@ -3,7 +3,8 @@
         <div class="winner-card-inner">
 
             <div class="winner-badge">
-                <img src="/Winner_badge.png" alt="Winner Badge">
+                <img v-if="winner.name !== 'No correct guess.'" src="/Winner_badge.png" alt="Winner Badge">
+                <img v-else src="/Oops_badge.png" alt="Oops" class="oops">
             </div>
 
             <div class="winner-photo">
@@ -129,7 +130,7 @@ onMounted(() => {
 
 <style scoped>
 .winner-card {
-    width: var(--card-width);
+    width: calc(var(--card-width) * 0.9);
     height: var(--card-height);
 
     padding: calc(var(--card-width) * 0.046);
@@ -177,6 +178,12 @@ onMounted(() => {
 .winner-badge img {
     width: 100%;
     display: block;
+}
+
+.winner-badge .oops {
+    width: 100%;
+    margin: 0 auto;
+    height: 90%;
 }
 
 .winner-photo {
