@@ -7,8 +7,6 @@
 
     <Background />
 
-
-
     <div v-if="error" class="error-container">
       <img src="/error-img.jpg" alt="Error fetching match" class="error-image" />
     </div>
@@ -63,27 +61,19 @@ const showIntro = ref(true)
 onMounted(() => {
   setTimeout(() => {
     showIntro.value = false
-  }, 1000) // matches the scroll-up animation timing
+  }, 1000)
 })
 
 const showWinner = () => {
   isExiting.value = true
   setTimeout(() => {
     goToWinner()
-  }, 800) // Increased from 600ms to 1200ms
+  }, 800)
 }
 </script>
 
 <style scoped>
-/* Fade transition for the Intro component */
-.fade-leave-active {
-  transition: opacity 2.5s ease-in-out;
-}
-
-.fade-leave-to {
-  opacity: 0;
-}
-
+/* ── Global reset / base ── */
 .choose-page {
   position: relative;
   width: 100%;
@@ -93,8 +83,16 @@ const showWinner = () => {
   scrollbar-gutter: stable;
 }
 
-/* ========== EXIT ANIMATIONS — SLOWER ========== */
+/* ── Fade transition for Intro ── */
+.fade-leave-active {
+  transition: opacity 2.5s ease-in-out;
+}
 
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* ── EXIT ANIMATIONS ── */
 .choose-page.exiting .team-left {
   transform: translateX(-150vw);
   opacity: 0;
@@ -121,7 +119,6 @@ const showWinner = () => {
   opacity: 0;
 }
 
-/* Slower transition: 1.2s instead of 0.6s */
 .team-left,
 .team-right,
 .vs-container,
@@ -130,8 +127,7 @@ const showWinner = () => {
   transition: all 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
-/* ========== BASE STYLES ========== */
-
+/* ── MAIN CONTAINER ── */
 .prediction-container {
   position: relative;
   z-index: 5;
@@ -142,7 +138,8 @@ const showWinner = () => {
   min-height: 100vh;
   width: 100%;
   box-sizing: border-box;
-  padding: 33vh 4vw 5vh;
+  padding: 28vh 4vw 5vh;
+  /* base – will be overridden by responsive */
   opacity: 0;
   animation: fadeInContent 0.8s ease-out forwards;
   animation-delay: 1.6s;
@@ -160,57 +157,59 @@ const showWinner = () => {
   }
 }
 
-.prediction-container-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-
-}
-
+/* ── TITLE ── */
 .group-title {
   font-family: 'Work Sans', sans-serif;
   font-weight: 700;
-  font-size: clamp(10px, 2.8vw, 50px);
+  font-size: clamp(1.2rem, 3.2vw, 4.5rem);
   color: #ffffff;
-  margin: 0 0 6vh 0;
-  letter-spacing: -0.5px;
+  margin: 0 0 5vh 0;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
   text-shadow: 0 4px 15px rgba(0, 0, 0, 0.65);
+  text-align: center;
 }
 
+/* ── MATCH BOX ── */
 .match-box {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(1rem, 7vw, 30rem);
+  gap: clamp(1.5rem, 8vw, 12rem);
   width: 100%;
-  max-width: 80vw;
-  margin: 0 auto 5vh auto;
+  max-width: 85vw;
+  margin: 0 auto 4vh auto;
   box-sizing: border-box;
+  flex-wrap: wrap;
+  /* allows stacking on small screens */
 }
 
+/* ── TEAM WRAPPERS ── */
 .team-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: 0 1 auto;
+  min-width: 0;
+  /* prevent overflow */
 }
 
+/* ── VS CONTAINER ── */
 .vs-container {
   position: relative;
-  width: clamp(60px, 10vw, 500px);
+  width: clamp(80px, 12vw, 240px);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-
+  aspect-ratio: 1 / 1;
 }
 
 .vs-svg {
   position: relative;
   z-index: 2;
-  height: clamp(80px, 15vw, 800px);
-  width: auto;
+  width: 100%;
+  height: auto;
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -219,45 +218,44 @@ const showWinner = () => {
 .ani3 {
   position: absolute;
   top: 50%;
-  opacity: 0.8;
+  left: 50%;
   transform: translate(-50%, -50%);
   z-index: 1;
   pointer-events: none;
   mix-blend-mode: screen;
+  opacity: 0.8;
 }
 
 .ani1 {
   width: 170%;
-  left: 50%;
   height: auto;
 }
 
 .ani2 {
   width: 260%;
-  left: 90%;
   top: 30%;
-  height: auto;
+  left: 90%;
 }
 
 .ani3 {
   width: 150%;
-  left: 90%;
   top: 30%;
-  height: auto;
+  left: 90%;
 }
 
+/* ── BUTTON ── */
 .button-wrapper {
   display: flex;
   justify-content: center;
   width: 100%;
-  margin-top: clamp(2vh, 2vw, 15vh);
+  margin-top: clamp(1.5rem, 4vh, 4rem);
   transition: all 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
-/* Responsive */
+/* ── RESPONSIVE PADDING & STACKING ── */
 @media (max-width: 1024px) {
   .prediction-container {
-    padding-top: 25vh;
+    padding-top: 20vh;
   }
 
   .match-box {
@@ -268,24 +266,24 @@ const showWinner = () => {
 
 @media (max-width: 768px) {
   .prediction-container {
-    padding-top: 22vh;
+    padding-top: 15vh;
     justify-content: flex-start;
   }
 
   .match-box {
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 1rem;
     margin-bottom: 2rem;
   }
 
   .vs-container {
     transform: rotate(90deg);
     margin: 1.5rem 0;
-    height: auto;
+    width: clamp(80px, 20vw, 140px);
   }
 
   .vs-container .vs-svg {
-    height: 100px;
+    width: 100%;
   }
 
   .button-wrapper {
@@ -301,7 +299,42 @@ const showWinner = () => {
   }
 }
 
-/* Error Showcase Styling */
+@media (min-width: 1400px) {
+  .prediction-container {
+    padding-top: 30vh;
+  }
+
+  .match-box {
+    max-width: 70vw;
+    gap: 10vw;
+  }
+
+  .group-title {
+    font-size: clamp(2.5rem, 3.5vw, 5rem);
+  }
+}
+
+@media (min-width: 2560px) {
+  .prediction-container {
+    padding-top: 28vh;
+  }
+
+  .match-box {
+    max-width: 60vw;
+    gap: 12vw;
+  }
+
+  .group-title {
+    font-size: clamp(3.5rem, 4vw, 6rem);
+    margin-bottom: 6vh;
+  }
+
+  .vs-container {
+    width: clamp(150px, 14vw, 300px);
+  }
+}
+
+/* ── ERROR CONTAINER – FULLY RESPONSIVE ── */
 .error-container {
   display: flex;
   flex-direction: column;
@@ -309,23 +342,20 @@ const showWinner = () => {
   justify-content: center;
   position: relative;
   z-index: 10;
-  margin-top: 38vh;
+  margin: 0 auto;
   padding: 0;
-  width: 90%;
-  max-width: 400px;
+  width: min(80%, 400px);
   aspect-ratio: 3 / 4;
-  margin-left: auto;
-  margin-right: auto;
+  margin-top: clamp(20vh, 30vh, 35vh);
 }
 
 .error-image {
   width: 100%;
   height: 100%;
-  max-width: 100%;
-  border-radius: 24px;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
-  border: 4px solid #ffffff;
   object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+  border: 2px solid #ffffff;
   animation: errorFadeIn 0.6s ease-out;
 }
 
@@ -341,13 +371,11 @@ const showWinner = () => {
   }
 }
 
-/* Responsive Error Container for Tablets and Mobile */
+/* Error container – tablet */
 @media (max-width: 768px) {
   .error-container {
-    width: 82%;
-    max-width: 340px;
-    margin-top: 28vh;
-    padding: 0;
+    width: min(75%, 340px);
+    margin-top: 22vh;
   }
 
   .error-image {
@@ -356,11 +384,11 @@ const showWinner = () => {
   }
 }
 
-/* Responsive Error Container for Large TV screens */
+/* Error container – large screens (TV) */
 @media (min-width: 1920px) {
   .error-container {
-    max-width: 460px;
-    margin-top: 32vh;
+    width: min(60%, 460px);
+    margin-top: 28vh;
   }
 
   .error-image {
@@ -370,11 +398,11 @@ const showWinner = () => {
   }
 }
 
-/* Responsive Error Container for 4K screens */
+/* Error container – 4K */
 @media (min-width: 2560px) {
   .error-container {
-    max-width: 580px;
-    margin-top: 30vh;
+    width: min(55%, 580px);
+    margin-top: 25vh;
   }
 
   .error-image {
@@ -384,6 +412,21 @@ const showWinner = () => {
   }
 }
 
+/* Error container – 8K */
+@media (min-width: 5120px) {
+  .error-container {
+    width: min(45%, 700px);
+    margin-top: 22vh;
+  }
+
+  .error-image {
+    border-radius: 64px;
+    border-width: 10px;
+    box-shadow: 0 45px 95px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* ── UTILITY ANIMATIONS ── */
 @keyframes pulse {
   0% {
     transform: scale(1);
