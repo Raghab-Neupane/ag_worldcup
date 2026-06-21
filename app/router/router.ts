@@ -5,7 +5,6 @@ import { navigateTo } from '#app'
 export const ROUTES = {
   CHOOSE: '/choose',
   WINNER: '/winner',
-  CONGRATULATIONS: '/congratulations'
 }
 
 /**
@@ -20,11 +19,4 @@ export function goToWinner() {
  */
 export function goToChoose() {
   return navigateTo(ROUTES.CHOOSE)
-}
-
-/**
- * Navigates to the Congratulations page.
- */
-export function goToCongratulations() {
-  return navigateTo(ROUTES.CONGRATULATIONS)
 }
