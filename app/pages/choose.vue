@@ -1,16 +1,17 @@
 <template>
   <div class="choose-page" :class="{ 'exiting': isExiting }">
 
-    <Transition name="fade">
-      <IntroTransition v-if="showIntro" />
-    </Transition>
-
     <Background />
+
+    <!-- Fire background music -->
+    <audio ref="fireAudio" src="/Fire.mp3" loop></audio>
+    <!-- Whoosh sound – plays when navigating to winner -->
+    <audio ref="whooshAudio" src="/Whoosh.mp3"></audio>
 
     <div v-if="error" class="error-container">
       <img src="/error-img.jpg" alt="Error fetching match" class="error-image" />
     </div>
-    <main v-else class="prediction-container">
+    <main v-else-if="!pending" class="prediction-container">
       <div class="prediction-container-wrapper">
         <h2 class="group-title">{{ selectedMatch?.stage }}</h2>
 
@@ -20,10 +21,13 @@
           </div>
 
           <div class="vs-container">
-            <img src="/vs.svg" alt="vs" class="vs-svg" />
-            <img src="/animations/spark1.gif" class="ani1" alt="">
-            <img src="/animations/spark2.gif" class="ani2" alt="">
-            <img src="/animations/electric.gif" class="ani3" alt="">
+            <img src="/vs.png" alt="VS" class="vs-svg" />
+            <img src="/animations/spark1.gif" class="ani1" alt="" loading="eager"
+              onerror="this.style.opacity='0'; this.style.background='radial-gradient(circle, #ffdd00, transparent)'">
+            <img src="/animations/spark2.gif" class="ani2" alt="" loading="eager"
+              onerror="this.style.opacity='0'; this.style.background='radial-gradient(circle, #ffdd00, transparent)'">
+            <img src="/animations/electric.gif" class="ani3" alt="" loading="eager"
+              onerror="this.style.opacity='0'; this.style.background='radial-gradient(circle, #ffdd00, transparent)'">
           </div>
 
           <div class="team-wrapper team-right">
@@ -36,20 +40,40 @@
         <ViewWinnerButton @click="showWinner" />
       </div>
     </main>
+
+    <!-- Intro overlay -->
+    <div class="intro-layer">
+      <Transition name="fade">
+        <LogoIntro v-if="showIntro" />
+      </Transition>
+      <Transition name="fade">
+        <IntroTransition v-if="showTransition" />
+      </Transition>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useFetch } from '#app'
+import {
+  playTechno,
+  forcePlayFire,
+  fireAudioRef,
+  stopFire
+} from '~/stores/audio'
 
 const config = useRuntimeConfig()
-const { data: selectedMatch, error } = await useFetch<any>(`${config.public.apiBase}/matches/selectedmatch`)
-if (selectedMatch.value?.post_id) {
-  sessionStorage.setItem('selectedPostId', selectedMatch.value.post_id)
-}
+const { data: selectedMatch, error, pending } = useFetch<any>(`${config.public.apiBase}/matches/selectedmatch`)
+
+watch(selectedMatch, (val) => {
+  if (val?.post_id) {
+    sessionStorage.setItem('selectedPostId', val.post_id)
+  }
+})
 
 import Background from '../components/background.vue'
+import LogoIntro from '../components/intro.vue'
 import IntroTransition from '../components/transition.vue'
 import Countrybox from '../components/countrybox.vue'
 import ViewWinnerButton from '../components/button.vue'
@@ -57,14 +81,80 @@ import { goToWinner } from '../router/router'
 
 const isExiting = ref(false)
 const showIntro = ref(true)
+const showTransition = ref(false)
 
+const INTRO_DURATION = 6000
+const TRANSITION_DURATION = 2200
+
+// ─── Audio refs ──────────────────────────────────────────────
+const fireAudio = ref<HTMLAudioElement | null>(null)
+const whooshAudio = ref<HTMLAudioElement | null>(null)
+
+// Register Fire with the global store
+onMounted(() => {
+  if (fireAudio.value) {
+    fireAudioRef.value = fireAudio.value
+  }
+})
+
+function playFire() {
+  if (!fireAudio.value) return
+  fireAudio.value.currentTime = 0
+  fireAudio.value.volume = 1.0
+  const promise = fireAudio.value.play()
+  if (promise !== undefined) {
+    promise
+      .then(() => console.log('🔥 Fire started (autoplay allowed)'))
+      .catch((err) => console.warn('⚠️ Fire autoplay blocked – no fallback', err.message))
+  }
+}
+
+function playWhoosh() {
+  if (!whooshAudio.value) return
+  whooshAudio.value.currentTime = 0
+  const promise = whooshAudio.value.play()
+  if (promise !== undefined) {
+    promise
+      .then(() => console.log('💨 Whoosh played'))
+      .catch((err) => console.warn('⚠️ Whoosh blocked:', err.message))
+  }
+}
+
+function stopWhoosh() {
+  if (whooshAudio.value) {
+    whooshAudio.value.pause()
+    whooshAudio.value.currentTime = 0
+  }
+}
+
+// Clean up on unmount
+onUnmounted(() => {
+  stopFire()
+  stopWhoosh()
+  fireAudioRef.value = null
+})
+
+// ─── Intro / transition timing ──────────────────────────────
 onMounted(() => {
   setTimeout(() => {
     showIntro.value = false
-  }, 1000)
+    playTechno()
+
+    showTransition.value = true
+
+    setTimeout(() => {
+      showTransition.value = false
+      playFire()
+    }, TRANSITION_DURATION)
+
+  }, INTRO_DURATION)
 })
 
+// ─── Navigation ──────────────────────────────────────────────
 const showWinner = () => {
+  // Play whoosh sound before the slide-out
+  playWhoosh()
+
   isExiting.value = true
   setTimeout(() => {
     goToWinner()
@@ -83,7 +173,13 @@ const showWinner = () => {
   scrollbar-gutter: stable;
 }
 
-/* ── Fade transition for Intro ── */
+.intro-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+}
+
 .fade-leave-active {
   transition: opacity 2.5s ease-in-out;
 }
@@ -92,7 +188,6 @@ const showWinner = () => {
   opacity: 0;
 }
 
-/* ── EXIT ANIMATIONS ── */
 .choose-page.exiting .team-left {
   transform: translateX(-150vw);
   opacity: 0;
@@ -120,12 +215,14 @@ const showWinner = () => {
 .team-left,
 .team-right,
 .vs-container,
-.group-title,
-.button-wrapper {
+.group-title {
   transition: all 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
-/* ── MAIN CONTAINER ── */
+.button-wrapper {
+  transition: opacity 1.2s ease;
+}
+
 .prediction-container {
   position: relative;
   z-index: 5;
@@ -137,10 +234,9 @@ const showWinner = () => {
   width: 100%;
   box-sizing: border-box;
   padding: 28vh 4vw 5vh;
-  /* base – will be overridden by responsive */
   opacity: 0;
   animation: fadeInContent 0.8s ease-out forwards;
-  animation-delay: 1.6s;
+  animation-delay: 8.2s;
 }
 
 @keyframes fadeInContent {
@@ -155,7 +251,6 @@ const showWinner = () => {
   }
 }
 
-/* ── TITLE ── */
 .group-title {
   font-family: 'Work Sans', sans-serif;
   font-weight: 700;
@@ -168,7 +263,6 @@ const showWinner = () => {
   text-align: center;
 }
 
-/* ── MATCH BOX ── */
 .match-box {
   display: flex;
   align-items: center;
@@ -179,20 +273,16 @@ const showWinner = () => {
   margin: 0 auto 4vh auto;
   box-sizing: border-box;
   flex-wrap: wrap;
-  /* allows stacking on small screens */
 }
 
-/* ── TEAM WRAPPERS ── */
 .team-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
   flex: 0 1 auto;
   min-width: 0;
-  /* prevent overflow */
 }
 
-/* ── VS CONTAINER ── */
 .vs-container {
   position: relative;
   width: clamp(80px, 12vw, 240px);
@@ -241,16 +331,13 @@ const showWinner = () => {
   left: 90%;
 }
 
-/* ── BUTTON ── */
 .button-wrapper {
   display: flex;
   justify-content: center;
   width: 100%;
   margin-top: clamp(1.5rem, 4vh, 4rem);
-  transition: all 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
-/* ── RESPONSIVE PADDING & STACKING ── */
 @media (max-width: 1024px) {
   .prediction-container {
     padding-top: 20vh;
@@ -332,7 +419,6 @@ const showWinner = () => {
   }
 }
 
-/* ── ERROR CONTAINER – FULLY RESPONSIVE ── */
 .error-container {
   display: flex;
   flex-direction: column;
@@ -369,7 +455,6 @@ const showWinner = () => {
   }
 }
 
-/* Error container – tablet */
 @media (max-width: 768px) {
   .error-container {
     width: min(75%, 340px);
@@ -382,7 +467,6 @@ const showWinner = () => {
   }
 }
 
-/* Error container – large screens (TV) */
 @media (min-width: 1920px) {
   .error-container {
     width: min(60%, 460px);
@@ -396,7 +480,6 @@ const showWinner = () => {
   }
 }
 
-/* Error container – 4K */
 @media (min-width: 2560px) {
   .error-container {
     width: min(55%, 580px);
@@ -410,7 +493,6 @@ const showWinner = () => {
   }
 }
 
-/* Error container – 8K */
 @media (min-width: 5120px) {
   .error-container {
     width: min(45%, 700px);
@@ -424,7 +506,6 @@ const showWinner = () => {
   }
 }
 
-/* ── UTILITY ANIMATIONS ── */
 @keyframes pulse {
   0% {
     transform: scale(1);

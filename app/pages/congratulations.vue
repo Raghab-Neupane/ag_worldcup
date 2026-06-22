@@ -2,11 +2,21 @@
     <section class="congratulations-page" :class="{ 'overlay-mode': isOverlay, 'pre-reveal': isOverlay && !visible }">
         <Background v-if="!isOverlay" />
 
+        <audio src="/Cheering.mp3" autoplay></audio>
+        <audio src="/Fireworks 2.mp3" autoplay loop></audio>
+        <audio src="/Fireworks.mp3" autoplay loop></audio>
+
         <!-- Lottie Animations Container -->
         <div class="animations-container">
-            <div ref="confettiLottie" class="lottie-animation confetti-lottie"></div>
-            <div ref="fireworkLottie" class="lottie-animation firework-lottie"></div>
-            <div ref="fireworkLottie2" class="lottie-animation firework-lottie-2"></div>
+            <!-- Confetti: left, center, right -->
+            <div ref="confettiLottieLeft" class="lottie-animation confetti-lottie-left"></div>
+            <div ref="confettiLottieCenter" class="lottie-animation confetti-lottie-center"></div>
+            <div ref="confettiLottieRight" class="lottie-animation confetti-lottie-right"></div>
+
+            <!-- Fireworks: left, center, right -->
+            <div ref="fireworkLottieLeft" class="lottie-animation firework-lottie-left"></div>
+            <div ref="fireworkLottieCenter" class="lottie-animation firework-lottie-center"></div>
+            <div ref="fireworkLottieRight" class="lottie-animation firework-lottie-right"></div>
         </div>
 
         <div class="congrats-container" :class="{ 'animate-in': animateIn }">
@@ -56,16 +66,7 @@ import Background from '../components/background.vue'
 
 const props = withDefaults(defineProps<{
     isOverlay?: boolean
-    // When true (default), the page renders normally. When used as the
-    // winner.vue overlay, this starts false — the stage is mounted and
-    // measurable (images loaded, anchor laid out) but invisible, so the
-    // card can morph to the real dock size before anything is shown.
-    // Parent flips this true once the hold ends, fading everything in.
     visible?: boolean
-    // When provided (winner already known from the reel/flip step), skip
-    // the page's own fetch and just use this — avoids double-fetching and
-    // any chance the overlay shows a different winner than the card that's
-    // mid-flight onto the stage.
     winner?: {
         name: string
         photo?: string
@@ -86,14 +87,20 @@ interface Winner {
 }
 
 const animateIn = ref(false)
-let confettiInstance: any = null
-let fireworkInstance: any = null
-let firework2Instance: any = null
+let confettiLeftInstance: any = null
+let confettiCenterInstance: any = null
+let confettiRightInstance: any = null
+let fireworkLeftInstance: any = null
+let fireworkCenterInstance: any = null
+let fireworkRightInstance: any = null
 const intervals: number[] = []
 
-const confettiLottie = ref<HTMLDivElement | null>(null)
-const fireworkLottie = ref<HTMLDivElement | null>(null)
-const fireworkLottie2 = ref<HTMLDivElement | null>(null)
+const confettiLottieLeft = ref<HTMLDivElement | null>(null)
+const confettiLottieCenter = ref<HTMLDivElement | null>(null)
+const confettiLottieRight = ref<HTMLDivElement | null>(null)
+const fireworkLottieLeft = ref<HTMLDivElement | null>(null)
+const fireworkLottieCenter = ref<HTMLDivElement | null>(null)
+const fireworkLottieRight = ref<HTMLDivElement | null>(null)
 const stageWrapperEl = ref<HTMLDivElement | null>(null)
 const cardDockAnchor = ref<HTMLDivElement | null>(null)
 
@@ -110,21 +117,12 @@ const cardSizeVars = computed(() => ({
     '--card-height': `${cardHeight.value}px`
 }))
 
-// Stage wrapper style: scales with card width, keeping proportions.
-// No hard maxWidth cap — on an 8K TV the stage should genuinely get big,
-// not stall out at a tiny fixed pixel ceiling meant for laptop screens.
-//
-// NOTE: height multiplier bumped 1.25 -> 1.35 to give the now-larger
-// card-dock-anchor enough vertical headroom so the bigger card doesn't
-// get visually cropped against the top of this wrapper.
 const stageStyle = computed(() => ({
-    width: `${cardWidth.value * 1.5}px`,   // stage wider than card
-    height: `${cardHeight.value * 1.35}px`, // enough space for card + stage elements
+    width: `${cardWidth.value * 1.5}px`,
+    height: `${cardHeight.value * 1.35}px`,
     margin: '0 auto'
 }))
 
-// Same width+height-based sizing as winner.vue, so a short laptop screen
-// doesn't get cards sized only off its width, and a big TV can scale up.
 const updateCardWidth = () => {
     const widthTarget = window.innerWidth / 6.5
     const heightTarget = window.innerHeight / 2.2
@@ -138,7 +136,6 @@ const config = useRuntimeConfig()
 const winnerData = ref<Winner | null>(null)
 
 if (props.winner !== undefined) {
-    // Winner handed down from winner.vue — already resolved, no fetch needed.
     watch(() => props.winner, (val) => {
         winnerData.value = val ? (val as Winner) : null
     }, { immediate: true })
@@ -183,19 +180,14 @@ const winnerImage = computed(() => {
         const base = config?.public?.assetsUrl || ''
         return base ? (base.endsWith('/') ? base + photo : base + '/' + photo) : photo
     }
-    return '/profile.webp'
+    return '/profile.png'
 })
 
 const handleImageError = (event: Event) => {
-    (event.target as HTMLImageElement).src = '/profile.svg'
+    (event.target as HTMLImageElement).src = '/profile.png'
 }
 
 // ─── Trigger the entrance fade-in ─────────────────────────────
-// Gated on `visible` instead of firing unconditionally on mount: when
-// used as the winner.vue overlay, the component mounts early (invisible)
-// purely so its stage can be measured — this only plays once the parent
-// actually reveals it. For non-overlay usage `visible` defaults true, so
-// this fires immediately exactly like before.
 watch(() => props.visible, (v) => {
     if (v) setTimeout(() => { animateIn.value = true }, 100)
 }, { immediate: true })
@@ -213,17 +205,12 @@ const loadAnimation = (fileName: string) => {
     })
 }
 
-// ─── Exposed: where should the WinnerReveal card land on the stage? ──
+// ─── Exposed: card dock position ─────────────────────────────
 const stageImagesLoadedCount = ref(0)
 const onStageImgLoad = () => {
     stageImagesLoadedCount.value += 1
 }
 
-// Resolves once both stage images have fired @load AND a couple of
-// animation frames have passed (so layout/paint has actually settled).
-// Reading getBoundingClientRect before this is what was causing the
-// card to land at the wrong spot/size — the stage hadn't finished
-// loading its images yet, so its box was still 0/garbage.
 const waitForStageReady = () => {
     return new Promise<void>((resolve) => {
         const check = () => {
@@ -237,11 +224,6 @@ const waitForStageReady = () => {
     })
 }
 
-// Returns the dock anchor's REAL on-screen box — center point (for
-// positioning) and actual pixel width/height (for sizing). No relative
-// scale math: the caller morphs the card directly to width/height, so
-// there's no approximation to drift out of sync with what's really
-// rendered.
 const getCardDockRect = () => {
     if (!cardDockAnchor.value) return null
     const rect = cardDockAnchor.value.getBoundingClientRect()
@@ -268,27 +250,60 @@ onMounted(async () => {
                 loadAnimation('Firework.json')
             ])
 
-            if (confettiLottie.value) {
-                confettiInstance = lottie.loadAnimation({
-                    container: confettiLottie.value,
+            // Confetti left
+            if (confettiLottieLeft.value) {
+                confettiLeftInstance = lottie.loadAnimation({
+                    container: confettiLottieLeft.value,
                     renderer: 'svg',
                     loop: true,
                     autoplay: true,
                     animationData: confettiData
                 })
             }
-            if (fireworkLottie.value) {
-                fireworkInstance = lottie.loadAnimation({
-                    container: fireworkLottie.value,
+            // Confetti center
+            if (confettiLottieCenter.value) {
+                confettiCenterInstance = lottie.loadAnimation({
+                    container: confettiLottieCenter.value,
+                    renderer: 'svg',
+                    loop: true,
+                    autoplay: true,
+                    animationData: confettiData
+                })
+            }
+            // Confetti right
+            if (confettiLottieRight.value) {
+                confettiRightInstance = lottie.loadAnimation({
+                    container: confettiLottieRight.value,
+                    renderer: 'svg',
+                    loop: true,
+                    autoplay: true,
+                    animationData: confettiData
+                })
+            }
+            // Firework left
+            if (fireworkLottieLeft.value) {
+                fireworkLeftInstance = lottie.loadAnimation({
+                    container: fireworkLottieLeft.value,
                     renderer: 'svg',
                     loop: true,
                     autoplay: true,
                     animationData: fireworkData
                 })
             }
-            if (fireworkLottie2.value) {
-                firework2Instance = lottie.loadAnimation({
-                    container: fireworkLottie2.value,
+            // Firework center
+            if (fireworkLottieCenter.value) {
+                fireworkCenterInstance = lottie.loadAnimation({
+                    container: fireworkLottieCenter.value,
+                    renderer: 'svg',
+                    loop: true,
+                    autoplay: true,
+                    animationData: fireworkData
+                })
+            }
+            // Firework right
+            if (fireworkLottieRight.value) {
+                fireworkRightInstance = lottie.loadAnimation({
+                    container: fireworkLottieRight.value,
                     renderer: 'svg',
                     loop: true,
                     autoplay: true,
@@ -303,9 +318,12 @@ onMounted(async () => {
 
 onUnmounted(() => {
     window.removeEventListener('resize', updateCardWidth)
-    confettiInstance?.destroy()
-    fireworkInstance?.destroy()
-    firework2Instance?.destroy()
+    confettiLeftInstance?.destroy()
+    confettiCenterInstance?.destroy()
+    confettiRightInstance?.destroy()
+    fireworkLeftInstance?.destroy()
+    fireworkCenterInstance?.destroy()
+    fireworkRightInstance?.destroy()
     intervals.forEach(clearInterval)
 })
 </script>
@@ -335,9 +353,6 @@ onUnmounted(() => {
     transition: opacity 0.5s ease;
 }
 
-/* Mounted-but-not-revealed state: stays in the layout (so images load
-   and the dock anchor is measurable) but is fully invisible and inert
-   until the parent flips `visible` to true. */
 .congratulations-page.overlay-mode.pre-reveal {
     opacity: 0;
     pointer-events: none;
@@ -359,24 +374,47 @@ onUnmounted(() => {
     pointer-events: none;
 }
 
-.confetti-lottie {
+/* Confetti – left, center, right */
+.confetti-lottie-left {
     top: 0;
     left: 0;
-    width: 100%;
+    width: 40%;
     height: 100%;
 }
 
-.firework-lottie {
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: min(50vw, 500px);
-    height: min(50vw, 500px);
+.confetti-lottie-center {
+    top: 0;
+    left: 30%;
+    width: 40%;
+    height: 100%;
 }
 
-.firework-lottie-2 {
+.confetti-lottie-right {
+    top: 0;
+    right: 0;
+    width: 40%;
+    height: 100%;
+}
+
+/* Fireworks – left, center, right */
+.firework-lottie-left {
     top: 20%;
-    left: 10%;
+    left: 3%;
+    width: min(30vw, 300px);
+    height: min(30vw, 300px);
+}
+
+.firework-lottie-center {
+    top: 10%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(35vw, 350px);
+    height: min(35vw, 350px);
+}
+
+.firework-lottie-right {
+    top: 20%;
+    right: 3%;
     width: min(30vw, 300px);
     height: min(30vw, 300px);
 }
@@ -462,13 +500,6 @@ onUnmounted(() => {
     filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.15));
 }
 
-/* Invisible marker — purely a geometry anchor read via getBoundingClientRect
-   so winner.vue knows exactly where to dock the incoming card. Sits where
-   the card should visually rest on the stage.
-   width/bottom bumped up from 48%/14% so the docked card grows tall
-   enough that its top edge reaches the white line/wreath crossover —
-   aspect-ratio is locked to the card's native shape, so height scales
-   automatically with width. Nudge these two values to fine-tune. */
 .card-dock-anchor {
     position: absolute;
     z-index: 3;
@@ -578,13 +609,18 @@ onUnmounted(() => {
         bottom: 6%;
     }
 
-    .firework-lottie {
-        width: 40vw;
-        height: 40vw;
+    /* Adjust firework sizes on tablets */
+    .firework-lottie-left,
+    .firework-lottie-right {
+        width: 25vw;
+        height: 25vw;
+        top: 15%;
     }
 
-    .firework-lottie-2 {
-        display: none;
+    .firework-lottie-center {
+        width: 30vw;
+        height: 30vw;
+        top: 8%;
     }
 }
 
@@ -605,9 +641,20 @@ onUnmounted(() => {
         max-width: 220px;
     }
 
-    .firework-lottie {
-        width: 50vw;
-        height: 50vw;
+    /* Fireworks smaller on phones */
+    .firework-lottie-left,
+    .firework-lottie-right {
+        width: 30vw;
+        height: 30vw;
+        top: 10%;
+        left: 2%;
+        right: 2%;
+    }
+
+    .firework-lottie-center {
+        width: 35vw;
+        height: 35vw;
+        top: 5%;
     }
 }
 

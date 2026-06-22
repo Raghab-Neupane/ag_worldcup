@@ -48,7 +48,7 @@ const MAX_CARD_WIDTH = 640
 const SPACING_FACTOR = 0.82
 
 const START_DELAY = 1200
-const SPIN_DURATION = 7000
+const SPIN_DURATION = 4500
 const START_SPEED = 100
 const MID_SPEED = 200
 const END_SPEED = 500
@@ -165,13 +165,55 @@ const getDelay = (progress: number) => {
     return MID_SPEED + (END_SPEED - MID_SPEED) * easeOutCubic(local)
 }
 
-const startScrollAnimation = () => {
+let spinAudio: HTMLAudioElement | null = null
+let clickListener: (() => void) | null = null
+
+// --- Helper to stop and clean up the spin audio ---
+function stopSpinAudio() {
+    if (spinAudio) {
+        try {
+            spinAudio.pause()
+            spinAudio.currentTime = 0
+        } catch (e) { /* ignore */ }
+        if (typeof window !== 'undefined') {
+            delete (window as any).spinAudio
+        }
+        spinAudio = null
+    }
+}
+
+// --- Start the spinning animation (only called after audio is playing) ---
+function startScrollAnimation() {
+    // --- Start the audio now that the spin begins ---
+    if (spinAudio) {
+        spinAudio.currentTime = 0
+        spinAudio.loop = true
+        const playPromise = spinAudio.play()
+        if (playPromise !== undefined) {
+            playPromise.catch(() => {
+                // Autoplay blocked → add one‑time click listener to retry
+                if (!clickListener) {
+                    clickListener = () => {
+                        document.removeEventListener('click', clickListener!)
+                        clickListener = null
+                        spinAudio?.play().catch(console.warn)
+                    }
+                    document.addEventListener('click', clickListener)
+                }
+            })
+        }
+    }
+
+    // --- Your existing animation code (unchanged) ---
     const startTime = performance.now()
 
     const animate = () => {
         const elapsed = performance.now() - startTime
 
         if (elapsed >= SPIN_DURATION) {
+            // Sound ends with the spin
+            stopSpinAudio()
+
             fadeReelCards.value = true
             setTimeout(() => {
                 showWinnerReveal.value = true
@@ -189,6 +231,24 @@ const startScrollAnimation = () => {
     }
 
     animate()
+}
+
+// --- Attempt to start the spin after the delay (audio is now handled inside startScrollAnimation) ---
+function initiateSpin() {
+    // 1. Get or create the audio element (but do NOT play it yet)
+    if (typeof window !== 'undefined' && (window as any).spinAudio) {
+        spinAudio = (window as any).spinAudio
+    } else {
+        spinAudio = new Audio('/Spin.mp3')
+        spinAudio.loop = true
+        if (typeof window !== 'undefined') {
+            (window as any).spinAudio = spinAudio
+        }
+    }
+
+    // 2. Schedule the spin start (audio will be played when this function runs)
+    if (startTimeout) clearTimeout(startTimeout)
+    startTimeout = setTimeout(startScrollAnimation, START_DELAY)
 }
 
 // ─── Flip finished → measure stage early, morph size, hold, then dock ──
@@ -216,6 +276,9 @@ const onFlipped = async () => {
         await nextTick()
         applyDock()
         hasDocked.value = true
+
+        // --- Audio is already stopped by this point (stopped at spin end) ---
+        // No stopSpinAudio() call here anymore.
     }, DOCK_DELAY)
 }
 
@@ -260,8 +323,7 @@ onMounted(async () => {
 
     initBuffer()
 
-    startTimeout = setTimeout(() => startScrollAnimation(), START_DELAY)
-
+    // Fetch winner data
     const postId = sessionStorage.getItem('selectedPostId')
     if (postId) {
         try {
@@ -277,6 +339,9 @@ onMounted(async () => {
             console.error('Failed to fetch winner on winner page:', e)
         }
     }
+
+    // Start the spin process – this will schedule the animation start
+    initiateSpin()
 })
 
 onUnmounted(() => {
@@ -286,8 +351,128 @@ onUnmounted(() => {
     if (resyncRaf) cancelAnimationFrame(resyncRaf)
     if (startTimeout) clearTimeout(startTimeout)
     if (scrollTimeout) clearTimeout(scrollTimeout)
+    if (clickListener) {
+        document.removeEventListener('click', clickListener)
+        clickListener = null
+    }
+    stopSpinAudio()
 })
 </script>
+
+<style scoped>
+.winner-page {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.card-stage {
+    position: relative;
+    width: 100%;
+    height: clamp(280px, 58vh, 1100px);
+    margin-top: clamp(32px, 8vh, 160px);
+}
+
+.card-wrapper {
+    position: absolute;
+    width: var(--card-width);
+    height: var(--card-height);
+    transform-origin: center center;
+    transition:
+        transform 150ms ease-out,
+        opacity 300ms ease;
+    will-change: transform;
+}
+
+.card-wrapper>* {
+    width: 100% !important;
+    height: 100% !important;
+    display: block;
+}
+
+.fade-left {
+    opacity: 0;
+    transform: translateX(-1200px) scale(0.4) !important;
+}
+
+.fade-right {
+    opacity: 0;
+    transform: translateX(1200px) scale(0.4) !important;
+}
+
+.hide-center {
+    opacity: 0;
+    transition: none;
+}
+
+/* Mini stage/platform behind the spinning cards. Sizing now mirrors
+   congratulations.vue's .stage-wrapper exactly (1.5x card width,
+   1.45x card height) and the image rules below mirror its
+   .stage-image / .crop-image, so the platform reads at the same scale
+   during the spin as it does once the card is docked — no visual jump
+   in the background stage itself when the page swaps over. */
+.stage-container {
+    position: absolute;
+    left: 50%;
+    bottom: -60px;
+    width: calc(var(--card-width) * 1.5);
+    height: calc(var(--card-height, 300px) * 1.45);
+    max-width: 1100px;
+    transform: translateX(-50%);
+    z-index: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    transition: opacity 990ms ease;
+}
+
+.stage-container.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.stage-image {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 900px;
+    height: auto;
+    display: block;
+    filter: drop-shadow(0 6px 15px rgba(0, 0, 0, 0.45));
+}
+
+.crop-image {
+    position: absolute;
+    z-index: 2;
+    left: 50%;
+    bottom: 10%;
+    width: 130%;
+    max-width: 1100px;
+    height: auto;
+    transform: translateX(-50%);
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.15));
+}
+
+@media (max-width: 768px) {
+    .card-stage {
+        height: 400px;
+        margin-top: 60px;
+    }
+
+    .stage-image {
+        max-width: 280px;
+    }
+
+    .crop-image {
+        max-width: 320px;
+    }
+}
+</style>
 
 <style scoped>
 .winner-page {

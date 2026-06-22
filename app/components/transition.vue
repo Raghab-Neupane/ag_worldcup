@@ -15,7 +15,6 @@
             </div>
             <img src="/AGLogo.png" class="AGLogo" alt="">
             <div class="righttop-white-overlay">
-
                 <img src="/rtoverlay.png" alt="">
             </div>
 
@@ -25,7 +24,24 @@
         </div>
     </section>
 </template>
+
+<script setup lang="ts">
+import { onMounted, onUnmounted } from 'vue'
+import { setIntroPlaying } from '~/stores/audio'
+
+onMounted(() => {
+    // Transition starts – pause/defer audio
+    setIntroPlaying(true)
+})
+
+onUnmounted(() => {
+    // Transition ends – allow audio to play
+    setIntroPlaying(false)
+})
+</script>
+
 <style scoped>
+/* ... (your existing styles unchanged) ... */
 @import url('https://fonts.googleapis.com/css2?family=Kanit:ital,wght@1,900&display=swap');
 
 html,
@@ -56,7 +72,6 @@ body {
     height: 100%;
 }
 
-/* Stadium background image styling with custom vignette & dark gradient overlays */
 .bg-img {
     position: absolute;
     top: 0;
@@ -80,9 +95,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    /* Radial vignette to darken edges & add dramatic center lighting, plus linear dark fade to grass */
-    background:
-        radial-gradient(circle at 50% 30%, rgba(3, 16, 38, 0.4) 0%, rgba(1, 5, 13, 0.85) 80%),
+    background: radial-gradient(circle at 50% 30%, rgba(3, 16, 38, 0.4) 0%, rgba(1, 5, 13, 0.85) 80%),
         linear-gradient(to bottom, rgba(1, 5, 13, 0.8) 0%, transparent 30%, transparent 60%, rgba(1, 5, 13, 0.95) 100%);
     z-index: 2;
 }
@@ -96,7 +109,6 @@ body {
     z-index: 100;
 }
 
-/* White halftone dot matrices positioning and blend styling */
 .righttop-white-overlay {
     position: absolute;
     top: 0;
@@ -131,14 +143,12 @@ body {
     position: absolute;
     top: 50vh;
     transform: translateY(-50%);
-    /* Start at center */
     width: 100%;
     left: 0;
     z-index: 10;
     animation: titleScrollUp 2.2s cubic-bezier(0.25, 1, 0.3, 1) forwards;
 }
 
-/* Logo placement top left */
 .left-logo {
     position: absolute;
     top: clamp(1rem, 3vw, 2.5rem);
@@ -149,14 +159,11 @@ body {
 .left-logo img {
     height: auto;
     width: clamp(50px, 6vw, 300px);
-    /* Scales linearly on huge TVs */
     filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5));
 }
 
-/* Header container and centered glow effect */
 .header {
     position: relative;
-    /* Change to relative within tittle-wrapper */
     width: 100%;
     text-align: center;
     padding: 0 1.5rem;
@@ -169,13 +176,11 @@ body {
 .header img {
     width: 100%;
     max-width: clamp(350px, 45vw, 2500px);
-    /* Scales to fill 45% of an 8K screen */
     height: auto;
     display: block;
     filter: drop-shadow(-4px 4px 8px rgba(0, 0, 0, 0.5));
 }
 
-/* Atmospheric center aura glow behind the text */
 .header::before {
     content: '';
     position: absolute;
