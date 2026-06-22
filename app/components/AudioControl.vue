@@ -43,7 +43,7 @@ const toggle = () => {
 const goHome = () => {
     // Navigate to the home URL
     if (typeof window !== 'undefined') {
-        window.location.href = 'http://localhost:3000'
+        window.location.href = 'https://worldcup.ambition.guru/'
     }
 }
 </script>
