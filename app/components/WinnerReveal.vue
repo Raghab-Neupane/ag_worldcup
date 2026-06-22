@@ -147,7 +147,6 @@ const dockToStage = async (target: { top: string; left: string; scale?: number }
 
 defineExpose({ lockInPlace, dockToStage, morphToSize })
 </script>
-
 <style scoped>
 .reveal-container {
     position: absolute;
@@ -155,7 +154,10 @@ defineExpose({ lockInPlace, dockToStage, morphToSize })
     bottom: 0;
     transform: translateX(-50%) scale(1.15);
     z-index: 21;
-    filter: drop-shadow(0 0 25px rgba(245, 198, 43, 0.8)) drop-shadow(0 0 50px rgba(239, 150, 0, 0.5));
+
+    filter:
+        drop-shadow(0 0 6px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 20px rgba(255, 215, 0, 1)) drop-shadow(0 0 40px rgba(255, 200, 0, 0.95)) drop-shadow(0 0 80px rgba(255, 170, 0, 0.8));
+
     transition:
         top 1.1s cubic-bezier(0.22, 1, 0.36, 1),
         left 1.1s cubic-bezier(0.22, 1, 0.36, 1),
@@ -171,9 +173,6 @@ defineExpose({ lockInPlace, dockToStage, morphToSize })
     perspective: 1200px;
     perspective-origin: center center;
 
-    /* Lets the card's actual rendered shape ease toward the morph target
-       (driven by --card-width/--card-height above) instead of snapping
-       to it the instant the var changes. */
     transition:
         width 1.1s cubic-bezier(0.22, 1, 0.36, 1),
         height 1.1s cubic-bezier(0.22, 1, 0.36, 1);

@@ -2,6 +2,10 @@
     <section class="congratulations-page" :class="{ 'overlay-mode': isOverlay, 'pre-reveal': isOverlay && !visible }">
         <Background v-if="!isOverlay" />
 
+        <audio src="/Cheering.mp3" autoplay></audio>
+        <audio src="/Fireworks 2.mp3" autoplay loop></audio>
+        <audio src="/Fireworks.mp3" autoplay loop></audio>
+
         <!-- Lottie Animations Container -->
         <div class="animations-container">
             <div ref="confettiLottie" class="lottie-animation confetti-lottie"></div>
