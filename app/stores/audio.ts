@@ -4,7 +4,10 @@ import { ref } from 'vue'
 // ---------- Techno (global) ----------
 const audio = ref<HTMLAudioElement | null>(null)
 export const isPlaying = ref(false)
-export const volume = ref(0.2)
+export const volume = ref(0.8)
+export const isIntroPlaying = ref(false)   // shared flag
+
+let pendingStart = false                   // deferred start when intro ends
 
 function initTechno() {
     if (!audio.value) {
@@ -17,30 +20,51 @@ function initTechno() {
     }
 }
 
-export function playTechno() {
+// ---------- Control intro flag ----------
+export function setIntroPlaying(val: boolean) {
+    isIntroPlaying.value = val
+    // If intro just ended and we had a pending start, play now
+    if (!val && pendingStart) {
+        pendingStart = false
+        console.log('🎵 Intro ended – starting deferred audio')
+        forcePlayTechno()
+        forcePlayFire()
+    }
+}
+
+// ---------- Techno playback ----------
+function startTechno(force = false) {
     initTechno()
-    if (!audio.value || isPlaying.value) return
+    if (!audio.value) return
+    if (isPlaying.value) return
+
+    if (isIntroPlaying.value) {
+        pendingStart = true
+        console.log('⏸️ Intro active – audio deferred')
+        return
+    }
+
     audio.value.currentTime = 0
     audio.value.volume = volume.value
     const promise = audio.value.play()
     if (promise !== undefined) {
         promise
-            .then(() => { isPlaying.value = true; console.log('▶️ Techno autoplay') })
-            .catch(() => console.warn('⚠️ Techno blocked – use forcePlay'))
+            .then(() => {
+                isPlaying.value = true
+                console.log(`▶️ Techno ${force ? 'forced' : 'autoplay'}`)
+            })
+            .catch((err) => {
+                console.warn(`⚠️ Techno ${force ? 'force' : 'autoplay'} failed:`, err.message)
+            })
     }
 }
 
+export function playTechno() {
+    startTechno(false)
+}
+
 export function forcePlayTechno() {
-    initTechno()
-    if (!audio.value) return
-    if (isPlaying.value) return
-    audio.value.volume = volume.value
-    const promise = audio.value.play()
-    if (promise !== undefined) {
-        promise
-            .then(() => { isPlaying.value = true; console.log('▶️ Techno forced by user') })
-            .catch((err) => console.warn('⚠️ Force play failed:', err.message))
-    }
+    startTechno(true)
 }
 
 export function pauseTechno() {
@@ -56,8 +80,9 @@ export function toggleTechno() {
         pauseTechno()
     } else {
         // Turning on – try to start both Techno and Fire
+        // This will respect the intro flag via the internal checks
         forcePlayTechno()
-        forcePlayFire() // also try Fire
+        forcePlayFire()
     }
 }
 
@@ -65,17 +90,33 @@ export function toggleTechno() {
 export const fireAudioRef = ref<HTMLAudioElement | null>(null)
 export let fireStarted = false
 
-export function forcePlayFire() {
+function startFire(force = false) {
     const el = fireAudioRef.value
     if (!el) return
     if (fireStarted) return
+
+    if (isIntroPlaying.value) {
+        pendingStart = true
+        console.log('⏸️ Intro active – Fire deferred')
+        return
+    }
+
     el.volume = 1.0
     const promise = el.play()
     if (promise !== undefined) {
         promise
-            .then(() => { fireStarted = true; console.log('🔥 Fire forced by user') })
-            .catch((err) => console.warn('⚠️ Fire force failed:', err.message))
+            .then(() => {
+                fireStarted = true
+                console.log(`🔥 Fire ${force ? 'forced' : 'autoplay'}`)
+            })
+            .catch((err) => {
+                console.warn(`⚠️ Fire ${force ? 'force' : 'autoplay'} failed:`, err.message)
+            })
     }
+}
+
+export function forcePlayFire() {
+    startFire(true)
 }
 
 export function stopFire() {
@@ -87,3 +128,4 @@ export function stopFire() {
 }
 
 // Optional: set volume for Fire (not used now)
+// export function setFireVolume(val: number) { ... }

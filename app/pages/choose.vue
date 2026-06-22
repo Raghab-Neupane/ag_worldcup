@@ -3,8 +3,10 @@
 
     <Background />
 
-    <!-- Local Fire.mp3 – only plays on this page -->
+    <!-- Fire background music -->
     <audio ref="fireAudio" src="/Fire.mp3" loop></audio>
+    <!-- Whoosh sound – plays when navigating to winner -->
+    <audio ref="whooshAudio" src="/Whoosh.mp3"></audio>
 
     <div v-if="error" class="error-container">
       <img src="/error-img.jpg" alt="Error fetching match" class="error-image" />
@@ -19,7 +21,7 @@
           </div>
 
           <div class="vs-container">
-            <img src="/vs.png" alt="vs" class="vs-svg" />
+            <img src="/vs.png" alt="VS" class="vs-svg" />
             <img src="/animations/spark1.gif" class="ani1" alt="" loading="eager"
               onerror="this.style.opacity='0'; this.style.background='radial-gradient(circle, #ffdd00, transparent)'">
             <img src="/animations/spark2.gif" class="ani2" alt="" loading="eager"
@@ -84,10 +86,11 @@ const showTransition = ref(false)
 const INTRO_DURATION = 6000
 const TRANSITION_DURATION = 2200
 
-// Local Fire audio element reference
+// ─── Audio refs ──────────────────────────────────────────────
 const fireAudio = ref<HTMLAudioElement | null>(null)
+const whooshAudio = ref<HTMLAudioElement | null>(null)
 
-// Register the Fire audio element with the global store
+// Register Fire with the global store
 onMounted(() => {
   if (fireAudio.value) {
     fireAudioRef.value = fireAudio.value
@@ -106,36 +109,52 @@ function playFire() {
   }
 }
 
+function playWhoosh() {
+  if (!whooshAudio.value) return
+  whooshAudio.value.currentTime = 0
+  const promise = whooshAudio.value.play()
+  if (promise !== undefined) {
+    promise
+      .then(() => console.log('💨 Whoosh played'))
+      .catch((err) => console.warn('⚠️ Whoosh blocked:', err.message))
+  }
+}
+
+function stopWhoosh() {
+  if (whooshAudio.value) {
+    whooshAudio.value.pause()
+    whooshAudio.value.currentTime = 0
+  }
+}
+
 // Clean up on unmount
 onUnmounted(() => {
-  // Stop Fire and clear the global reference
   stopFire()
+  stopWhoosh()
   fireAudioRef.value = null
 })
 
+// ─── Intro / transition timing ──────────────────────────────
 onMounted(() => {
-  // Intro video plays from 0–6s
   setTimeout(() => {
     showIntro.value = false
-
-    // Techno starts at 6s (after intro)
     playTechno()
 
-    // Transition starts immediately after intro
     showTransition.value = true
 
-    // Transition runs for 2.2s (6–8.2s)
     setTimeout(() => {
       showTransition.value = false
-
-      // Fire starts at 8.2s (after intro + transition)
       playFire()
     }, TRANSITION_DURATION)
 
   }, INTRO_DURATION)
 })
 
+// ─── Navigation ──────────────────────────────────────────────
 const showWinner = () => {
+  // Play whoosh sound before the slide-out
+  playWhoosh()
+
   isExiting.value = true
   setTimeout(() => {
     goToWinner()

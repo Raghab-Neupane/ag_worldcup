@@ -8,7 +8,7 @@
             </div>
 
             <div class="winner-photo">
-                <img :src="winner.image || '/profile.svg'" @error="handleImageError" alt="Winner">
+                <img :src="winner.image || '/profile.png'" @error="handleImageError" alt="Winner">
             </div>
 
             <div class="winner-name">
@@ -54,7 +54,7 @@ const winner = computed(() => {
 
     let image = props.winnerImage || localWinner.value.image
     if (!image || image === 'photo' || image === 'dummy' || image === 'null' || image === 'undefined') {
-        image = '/profile.svg'
+        image = '/profile.png'
     }
 
     return {
@@ -120,7 +120,7 @@ const maskedPhone = computed(() => {
 })
 
 const handleImageError = (event: Event) => {
-    (event.target as HTMLImageElement).src = '/profile.svg'
+    (event.target as HTMLImageElement).src = '/profile.png'
 }
 
 onMounted(() => {
